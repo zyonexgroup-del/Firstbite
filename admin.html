@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>First Bite — Restaurant Owner & Admin Dashboard</title>
+    <meta name="description" content="Professional restaurant operations control center.">
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        /* Image upload area */
+        .img-upload-area {
+            border: 2px dashed var(--border-light);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-soft);
+        }
+        .img-upload-area:hover { border-color: var(--primary); background: var(--primary-light); }
+        .img-upload-area input[type="file"] { display: none; }
+        .img-tab-switch { display: flex; gap: 8px; margin-bottom: 8px; }
+        .img-tab-btn {
+            padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 700;
+            border: 1px solid var(--border-light); background: var(--bg-soft); color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .img-tab-btn.active { background: var(--primary); color: #FFF; border-color: var(--primary); }
+        #dish-img-preview {
+            width: 100%; max-height: 140px; object-fit: cover; border-radius: 10px;
+            margin-top: 8px; display: none; border: 1px solid var(--border-light);
+        }
+        /* Category modal */
+        #category-modal .modal-card { max-width: 420px; }
+        /* Date range */
+        .analytics-filter-bar {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            padding: 14px 0; border-bottom: 1px solid var(--border-light); margin-bottom: 20px;
+        }
+        #custom-date-row {
+            display: none; align-items: center; gap: 8px; margin-top: 4px; width: 100%;
+        }
+        /* Stock toggle – reuse staff style */
+        .stock-toggle-switch { position:relative; display:inline-block; width:40px; height:22px; }
+        .stock-toggle-switch input { opacity:0; width:0; height:0; }
+        .slider-round {
+            position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+            background:#CBD5E1; transition:.3s; border-radius:34px;
+        }
+        .slider-round:before {
+            position:absolute; content:""; height:14px; width:14px;
+            left:4px; bottom:4px; background:#FFF; transition:.3s; border-radius:50%;
+        }
+        input:checked + .slider-round { background:var(--primary); }
+        input:checked + .slider-round:before { transform:translateX(18px); }
+    </style>
+</head>
+<body>
+
+<div class="admin-layout">
+
+    <!-- ─── SIDEBAR ──────────────────────────────────────────── -->
+    <aside class="admin-sidebar">
+        <div class="sidebar-header">
+            <div class="brand-badge">FB</div>
+            <div>
+                <div class="brand-title">FIRST BITE</div>
+                <div class="brand-subtitle">Operations Cloud</div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-link" data-view="dashboard">📊 <span>Dashboard</span></div>
+            <div class="sidebar-link" data-view="orders">📋 <span>Live Orders</span></div>
+            <div class="sidebar-link" data-view="menu">🍔 <span>Menu Catalog</span></div>
+            <div class="sidebar-link" data-view="categories">🏷️ <span>Categories</span></div>
+            <div class="sidebar-link" data-view="coupons">🎟️ <span>Coupons &amp; Promos</span></div>
+            <div class="sidebar-link" data-view="qrcodes">📲 <span>Table QR Codes</span></div>
+            <div class="sidebar-link" data-view="settings">⚙️ <span>Settings</span></div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="realtime-pill"><span class="pulse-dot"></span><span>Supabase Live</span></div>
+            <span style="color:var(--text-muted);font-size:11px;">v2.5</span>
+        </div>
+    </aside>
+
+    <!-- ─── MAIN ──────────────────────────────────────────────── -->
+    <div class="admin-main">
+        <header class="admin-topbar">
+            <div class="topbar-title-box">
+                <h1 id="admin-restaurant-name">First Bite Bistro</h1>
+                <p id="admin-restaurant-tagline">Gourmet Flavors • Handcrafted Freshness</p>
+            </div>
+            <div class="topbar-actions">
+                <button class="kitchen-status-btn" id="admin-kitchen-toggle-btn" style="background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <span class="status-indicator-dot" id="admin-kitchen-dot" style="width:8px;height:8px;border-radius:50%;background:#10B981;"></span>
+                    <span id="admin-kitchen-text">Kitchen Open</span>
+                </button>
+                <a href="customer.html" target="_blank" class="btn-secondary" style="font-size:12.5px;text-decoration:none;">📱 Customer App</a>
+                <a href="staff.html"   target="_blank" class="btn-secondary" style="font-size:12.5px;text-decoration:none;">👨‍🍳 Staff App</a>
+            </div>
+        </header>
+
+        <!-- ══════════════════════════════════════════════════════
+             VIEW: DASHBOARD
+        ══════════════════════════════════════════════════════════ -->
+        <main class="admin-content-view active" id="view-dashboard">
+
+            <!-- Analytics date range filter -->
+            <div class="analytics-filter-bar">
+                <label style="font-size:13px;font-weight:700;color:var(--text-secondary);">Showing data for:</label>
+                <select id="analytics-range-select" style="font-weight:700;min-width:180px;">
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="last_month">Last Month</option>
+                    <option value="all">All Time</option>
+                    <option value="custom">Custom Range…</option>
+                </select>
+                <div id="custom-date-row" style="display:none;">
+                    <input type="date" id="custom-date-from" style="font-size:13px;">
+                    <span style="color:var(--text-muted);">to</span>
+                    <input type="date" id="custom-date-to"   style="font-size:13px;">
+                </div>
+            </div>
+
+            <!-- Metric cards -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon-box">💰</div>
+                    <div class="metric-label">Total Sales</div>
+                    <div class="metric-value" id="metric-sales">₹0</div>
+                    <div class="metric-trend">↑ Revenue</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon-box">📦</div>
+                    <div class="metric-label">Total Orders</div>
+                    <div class="metric-value" id="metric-orders">0</div>
+                    <div class="metric-trend">In selected period</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon-box" style="background:#FEF3C7;color:#D97706;">⏳</div>
+                    <div class="metric-label">Active / Pending</div>
+                    <div class="metric-value" id="metric-pending" style="color:#D97706;">0</div>
+                    <div style="font-size:12px;color:var(--text-secondary);">Currently in kitchen</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon-box" style="background:#DCFCE7;color:#15803D;">✓</div>
+                    <div class="metric-label">Completed Orders</div>
+                    <div class="metric-value" id="metric-completed" style="color:#15803D;">0</div>
+                    <div style="font-size:12px;color:var(--text-secondary);">Successfully served</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon-box">💳</div>
+                    <div class="metric-label">Avg Order Value (AOV)</div>
+                    <div class="metric-value" id="metric-aov">₹0</div>
+                    <div class="metric-trend">Per transaction</div>
+                </div>
+            </div>
+
+            <!-- Chart + Top Items -->
+            <div class="dashboard-grid-2">
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="panel-title">Revenue Trajectory (₹)</h3>
+                            <p style="font-size:12px;color:var(--text-secondary);">Last 7 days from real order data</p>
+                        </div>
+                        <span class="badge badge-green">Live</span>
+                    </div>
+                    <canvas id="sales-canvas"></canvas>
+                </div>
+
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <div>
+                            <h3 class="panel-title">Top Selling Dishes</h3>
+                            <p style="font-size:12px;color:var(--text-secondary);">By revenue in selected period</p>
+                        </div>
+                    </div>
+                    <div class="top-items-list" id="dashboard-top-items"></div>
+                </div>
+            </div>
+            <!-- Daily Order Breakdown Table -->
+            <div class="card-panel" id="daily-analytics-panel" style="margin-top:20px;">
+                <div class="panel-header">
+                    <div>
+                        <h3 class="panel-title">📅 Daily Order Breakdown</h3>
+                        <p style="font-size:12px;color:var(--text-secondary);">Revenue & order summary per day (from stored database)</p>
+                    </div>
+                    <span class="badge badge-green">Pitch Ready</span>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="data-table" id="daily-analytics-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Total Orders</th>
+                                <th>Completed</th>
+                                <th>Cancelled</th>
+                                <th>Gross Revenue</th>
+                                <th>Net Revenue</th>
+                                <th>Cash</th>
+                                <th>Online</th>
+                                <th>AOV</th>
+                            </tr>
+                        </thead>
+                        <tbody id="daily-analytics-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- ══════════════════════════════════════════════════════
+             VIEW: ORDERS
+        ══════════════════════════════════════════════════════════ -->
+        <section class="admin-content-view" id="view-orders">
+            <div class="table-container">
+                <div class="table-toolbar">
+                    <div class="table-search-box">
+                        <span class="table-search-icon">🔍</span>
+                        <input type="text" id="orders-search-input" placeholder="Search Order # or Customer name…">
+                    </div>
+                    <select id="orders-status-filter" style="font-weight:600;">
+                        <option value="all">All Statuses</option>
+                        <option value="new">New</option>
+                        <option value="preparing">Preparing</option>
+                        <option value="ready">Ready</option>
+                        <option value="served">Served</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Order #</th><th>Customer</th><th>Type / Table</th>
+                            <th>Items</th><th>Status</th><th>Amount & Pay</th><th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-table-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════
+             VIEW: MENU CATALOG
+        ══════════════════════════════════════════════════════════ -->
+        <section class="admin-content-view" id="view-menu">
+            <div class="table-container">
+                <div class="table-toolbar">
+                    <div class="table-search-box">
+                        <span class="table-search-icon">🔍</span>
+                        <input type="text" id="menu-search-input" placeholder="Search dishes…">
+                    </div>
+                    <button class="btn-primary" id="add-dish-btn">+ Add New Dish</button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Photo</th><th>Name & Description</th><th>Category & Diet</th>
+                            <th>Price</th><th>In Stock</th><th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="menu-table-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════
+             VIEW: CATEGORIES
+        ══════════════════════════════════════════════════════════ -->
+        <section class="admin-content-view" id="view-categories">
+            <div class="table-container" style="max-width:800px;">
+                <div class="table-toolbar">
+                    <h3 style="font-size:16px;font-weight:800;">Menu Categories</h3>
+                    <button class="btn-primary" id="add-cat-btn" style="padding:8px 16px;font-size:13px;">
+                        + New Category
+                    </button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Icon</th><th>Category Name</th><th>Items</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody id="categories-table-tbody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════
+             VIEW: COUPONS & PROMOS
+        ══════════════════════════════════════════════════════════ -->
+        <section class="admin-content-view" id="view-coupons">
+            <div class="table-container" style="max-width:900px;">
+                <div class="table-toolbar">
+                    <h3 style="font-size:16px;font-weight:800;">🎟️ Coupon &amp; Promo Codes</h3>
+                    <button class="btn-primary" id="add-coupon-btn" style="padding:8px 16px;font-size:13px;">+ Create Coupon</button>
+                </div>
+                <div id="coupons-list-container" style="margin-top:8px;"></div>
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════
+             VIEW: TABLE QR CODES (FOR RESTAURANT OWNER PITCH)
+        ══════════════════════════════════════════════════════════ -->
+        <section class="admin-content-view" id="view-qrcodes">
+            <div class="card-panel" style="max-width:850px;">
+                <div class="panel-header">
+                    <div>
+                        <h3 class="panel-title">📲 Table QR Codes Generator</h3>
+                        <p style="font-size:12px;color:var(--text-secondary);">Generate, test, and print high-resolution QR stands for each dining table</p>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px;align-items:start;">
+                    <div>
+                        <label style="font-size:13px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:8px;">Select Dining Table</label>
+                        <select id="qr-table-select" style="width:100%;font-size:15px;font-weight:700;padding:10px 12px;margin-bottom:14px;">
+                            <option value="1">Table 1 (Window Side)</option>
+                            <option value="2">Table 2</option>
+                            <option value="3">Table 3</option>
+                            <option value="4" selected>Table 4 (Center Booth)</option>
+                            <option value="5">Table 5</option>
+                            <option value="6">Table 6 (Terrace)</option>
+                            <option value="7">Table 7</option>
+                            <option value="8">Table 8</option>
+                            <option value="9">Table 9</option>
+                            <option value="10">Table 10</option>
+                        </select>
+
+                        <div style="background:var(--bg-soft);padding:14px;border-radius:10px;border:1px solid var(--border-light);margin-bottom:14px;">
+                            <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">Direct Menu URL</div>
+                            <div id="qr-link-url" style="font-family:monospace;font-size:12px;color:var(--primary);word-break:break-all;font-weight:700;">customer.html?table=4</div>
+                        </div>
+
+                        <div style="display:flex;gap:10px;">
+                            <a id="qr-test-btn" href="customer.html?table=4" target="_blank" class="btn-secondary" style="flex:1;text-align:center;text-decoration:none;font-size:13px;padding:10px;">
+                                🚀 Test Customer Link
+                            </a>
+                            <button id="qr-print-btn" class="btn-primary" style="flex:1;font-size:13px;padding:10px;">
+                                🖨️ Print Stand
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live QR Stand Card Preview -->
+                    <div id="qr-stand-card" style="background:#FFFFFF;border:2px solid #E2E8F0;border-radius:16px;padding:24px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,0.06);">
+                        <div style="font-size:18px;font-weight:900;color:#0F172A;letter-spacing:-0.02em;" id="qr-preview-resname">First Bite Bistro</div>
+                        <div style="font-size:11.5px;color:#64748B;margin-top:2px;">Scan with Camera to View Menu &amp; Order</div>
+                        <div style="margin:16px auto;padding:12px;background:#FFF;border-radius:12px;display:inline-block;box-shadow:0 2px 10px rgba(0,0,0,0.08);border:1px solid #E2E8F0;">
+                            <img id="qr-preview-img" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=customer.html%3Ftable%3D4" alt="Table QR" style="width:170px;height:170px;display:block;">
+                        </div>
+                        <div>
+                            <span style="font-size:16px;font-weight:900;color:var(--primary);background:#FEF2F2;padding:6px 18px;border-radius:20px;display:inline-block;" id="qr-preview-tablename">
+                                🍽️ Table 4
+                            </span>
+                        </div>
+                        <div style="font-size:11px;color:#94A3B8;margin-top:10px;">✓ Direct Table Ordering • No App Download Required</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════
+             VIEW: SETTINGS
+        ══════════════════════════════════════════════════════════ -->
+        <section class="admin-content-view" id="view-settings">
+            <div class="card-panel" style="max-width:720px;">
+                <div class="panel-header">
+                    <div>
+                        <h3 class="panel-title">Restaurant Profile & Settings</h3>
+                        <p style="font-size:12px;color:var(--text-secondary);">Changes broadcast instantly to all apps via Supabase Realtime</p>
+                    </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div>
+                        <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Restaurant Name</label>
+                        <input type="text" id="settings-name" style="width:100%;">
+                    </div>
+                    <div>
+                        <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Tagline</label>
+                        <input type="text" id="settings-tagline" style="width:100%;">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Contact Phone</label>
+                            <input type="text" id="settings-phone" style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Currency Symbol</label>
+                            <input type="text" id="settings-currency" style="width:100%;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Address</label>
+                        <textarea id="settings-address" rows="2" style="width:100%;resize:none;"></textarea>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">GST / Tax Rate (%)</label>
+                            <input type="number" id="settings-tax" step="0.5" style="width:100%;">
+                        </div>
+                        <div style="display:flex;flex-direction:column;justify-content:center;">
+                            <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Kitchen Status</label>
+                            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="settings-open" style="width:20px;height:20px;accent-color:var(--primary);">
+                                <span style="font-weight:700;font-size:13.5px;">Accepting Orders</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn-primary" id="save-settings-btn" style="padding:12px 28px;">
+                            Save & Broadcast Changes ⚡
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL: ADD / EDIT DISH (with image upload)
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="dish-modal">
+    <div class="modal-card" style="max-width:560px;">
+        <div class="flex-between" style="padding:18px 22px;border-bottom:1px solid var(--border-light);">
+            <h3 id="dish-modal-title" style="font-size:17px;font-weight:800;">Add Menu Item</h3>
+            <button class="btn-secondary" id="dish-modal-close-btn" style="width:32px;height:32px;border-radius:50%;padding:0;">✕</button>
+        </div>
+
+        <form id="dish-form" style="padding:20px 22px;display:flex;flex-direction:column;gap:14px;" onsubmit="return false;">
+
+            <!-- Dish Name -->
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Dish Title *</label>
+                <input type="text" id="dish-name" placeholder="e.g. Truffle Bacon Smashed Burger" style="width:100%;" required>
+            </div>
+
+            <!-- Category + Price -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Category</label>
+                    <select id="dish-category" style="width:100%;"></select>
+                </div>
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Base Price (₹) *</label>
+                    <input type="number" id="dish-price" placeholder="180" style="width:100%;" required>
+                </div>
+            </div>
+
+            <!-- Dietary -->
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:8px;">Dietary Type</label>
+                <div style="display:flex;gap:16px;">
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="radio" name="dish_veg" value="true" checked accent-color="#16A34A">
+                        <span class="diet-icon veg"></span>
+                        <span style="font-size:13px;font-weight:600;">Vegetarian</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input type="radio" name="dish_veg" value="false" accent-color="#DC2626">
+                        <span class="diet-icon non-veg"></span>
+                        <span style="font-size:13px;font-weight:600;">Non-Vegetarian</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- IMAGE: Upload OR URL ─── -->
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:8px;">Dish Photo</label>
+
+                <!-- Tab switcher -->
+                <div class="img-tab-switch">
+                    <button type="button" class="img-tab-btn active" id="switch-to-url"
+                        onclick="document.getElementById('img-url-area').style.display='block';document.getElementById('img-file-area').style.display='none';this.classList.add('active');document.getElementById('switch-to-upload').classList.remove('active')">
+                        🔗 Paste Image URL
+                    </button>
+                    <button type="button" class="img-tab-btn" id="switch-to-upload"
+                        onclick="document.getElementById('img-file-area').style.display='block';document.getElementById('img-url-area').style.display='none';this.classList.add('active');document.getElementById('switch-to-url').classList.remove('active')">
+                        📤 Upload From Device
+                    </button>
+                </div>
+
+                <!-- URL input area (default visible) -->
+                <div id="img-url-area">
+                    <input type="url" id="dish-img" placeholder="https://images.unsplash.com/…" style="width:100%;">
+                </div>
+
+                <!-- File upload area (hidden by default) -->
+                <div id="img-file-area" style="display:none;">
+                    <label class="img-upload-area" for="dish-img-file">
+                        <input type="file" id="dish-img-file" accept="image/*">
+                        <div style="font-size:28px;margin-bottom:6px;">📷</div>
+                        <div style="font-size:13px;font-weight:600;color:var(--text-secondary);">Click to choose photo from device</div>
+                        <div style="font-size:11.5px;color:var(--text-muted);margin-top:2px;">JPG, PNG, WebP — max ~2 MB for fast load</div>
+                    </label>
+                </div>
+
+                <!-- Preview thumbnail -->
+                <img id="dish-img-preview" src="" alt="Preview" style="display:none;width:100%;max-height:150px;object-fit:cover;border-radius:10px;margin-top:8px;border:1px solid var(--border-light);">
+            </div>
+            <!-- END IMAGE ────────── -->
+
+            <!-- Prep / Calories / Badge -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                <div>
+                    <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Prep Time</label>
+                    <input type="text" id="dish-prep" placeholder="12 min" style="width:100%;">
+                </div>
+                <div>
+                    <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Calories</label>
+                    <input type="text" id="dish-calories" placeholder="540 kcal" style="width:100%;">
+                </div>
+                <div>
+                    <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Badge</label>
+                    <select id="dish-badge" style="width:100%;">
+                        <option value="">None</option>
+                        <option value="Bestseller">Bestseller</option>
+                        <option value="Chef Special">Chef Special</option>
+                        <option value="Popular">Popular</option>
+                        <option value="New">New</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Description</label>
+                <textarea id="dish-desc" rows="2" placeholder="Describe ingredients, textures, flavour profile…" style="width:100%;resize:none;"></textarea>
+            </div>
+        </form>
+
+        <div style="padding:16px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:10px;">
+            <button class="btn-secondary" onclick="window.adminApp.closeDishModal()">Cancel</button>
+            <button class="btn-primary" id="dish-save-btn">Save Dish ✓</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL: ADD / EDIT CATEGORY
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="category-modal">
+    <div class="modal-card" style="max-width:420px;">
+        <div class="flex-between" style="padding:18px 22px;border-bottom:1px solid var(--border-light);">
+            <h3 id="cat-modal-title" style="font-size:17px;font-weight:800;">New Category</h3>
+            <button class="btn-secondary" id="cat-modal-close-btn" style="width:32px;height:32px;border-radius:50%;padding:0;">✕</button>
+        </div>
+        <div style="padding:22px;display:flex;flex-direction:column;gap:16px;">
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Category Name *</label>
+                <input type="text" id="cat-name-input" placeholder="e.g. Wraps & Rolls" style="width:100%;">
+            </div>
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Emoji Icon</label>
+                <input type="text" id="cat-icon-input" placeholder="🌯" maxlength="4" style="width:80px;font-size:24px;text-align:center;">
+                <p style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">Pick any emoji — shown in Customer App categories slider</p>
+            </div>
+        </div>
+        <div style="padding:16px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:10px;">
+            <button class="btn-secondary" onclick="window.adminApp.closeCategoryModal()">Cancel</button>
+            <button class="btn-primary" id="cat-save-btn">Save Category</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL: CREATE / EDIT COUPON
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="coupon-modal">
+    <div class="modal-card" style="max-width:480px;">
+        <div class="flex-between" style="padding:18px 22px;border-bottom:1px solid var(--border-light);">
+            <h3 id="coupon-modal-title" style="font-size:17px;font-weight:800;">🎟️ New Coupon</h3>
+            <button class="btn-secondary" id="coupon-modal-close-btn" style="width:32px;height:32px;border-radius:50%;padding:0;">✕</button>
+        </div>
+        <div style="padding:22px;display:flex;flex-direction:column;gap:14px;">
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Coupon Code *</label>
+                <input type="text" id="coupon-code-input" placeholder="e.g. FIRSTBITE20" style="width:100%;text-transform:uppercase;font-weight:800;letter-spacing:1px;" required>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Discount Type</label>
+                    <select id="coupon-type-select" style="width:100%;">
+                        <option value="percent">Percentage (%)</option>
+                        <option value="flat">Flat Amount (₹)</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Discount Value *</label>
+                    <input type="number" id="coupon-value-input" placeholder="20" style="width:100%;" min="1" required>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Min. Order Value (₹)</label>
+                    <input type="number" id="coupon-min-order-input" placeholder="0 = no minimum" style="width:100%;" min="0" value="0">
+                </div>
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Max Discount Cap (₹)</label>
+                    <input type="number" id="coupon-max-discount-input" placeholder="0 = no cap" style="width:100%;" min="0" value="0">
+                </div>
+            </div>
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Expires On (leave empty = no expiry)</label>
+                <input type="date" id="coupon-expiry-input" style="width:100%;">
+            </div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:var(--bg-soft);border-radius:8px;">
+                <input type="checkbox" id="coupon-active-toggle" checked style="width:18px;height:18px;accent-color:var(--primary);">
+                <span style="font-weight:700;font-size:13.5px;">Active (visible to customers)</span>
+            </label>
+        </div>
+        <div style="padding:16px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:10px;">
+            <button class="btn-secondary" onclick="window.adminApp.closeCouponModal()">Cancel</button>
+            <button class="btn-primary" id="coupon-save-btn" style="padding:10px 24px;">Save Coupon ✓</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL: RECEIPT
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="receipt-modal">
+    <div class="modal-card" style="max-width:420px;padding:20px;">
+        <div class="receipt-paper">
+            <div class="receipt-header">
+                <h2 id="receipt-rest-name" style="font-size:16px;margin-bottom:2px;">FIRST BITE BISTRO</h2>
+                <p id="receipt-rest-address" style="font-size:11px;"></p>
+                <p id="receipt-rest-phone"   style="font-size:11px;"></p>
+                <div id="receipt-order-no"   style="font-size:13px;font-weight:bold;margin-top:6px;"></div>
+                <div id="receipt-date-time"  style="font-size:10px;color:#555;"></div>
+                <div id="receipt-customer"   style="font-size:11px;margin-top:4px;"></div>
+            </div>
+            <div id="receipt-items-rows"></div>
+            <div class="receipt-total-row"><span>Subtotal:</span><span id="receipt-subtotal">₹0</span></div>
+            <div class="receipt-item-row" style="font-size:11px;"><span>GST:</span><span id="receipt-tax">₹0</span></div>
+            <div class="receipt-item-row" style="font-size:11px;"><span>Discount:</span><span id="receipt-discount">- ₹0</span></div>
+            <div class="receipt-total-row" style="font-size:15px;border-top:2px solid #000;">
+                <span>TOTAL:</span><span id="receipt-grand-total">₹0</span>
+            </div>
+            <div style="text-align:center;margin-top:12px;font-size:11px;border-top:1px dashed #777;padding-top:8px;">
+                Thank you! Powered by First Bite
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button class="btn-secondary" id="receipt-close-btn" style="flex:1;">Close</button>
+            <button class="btn-primary"   id="receipt-print-btn" style="flex:1;">🖨️ Print</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/sound-effects.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/common.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>

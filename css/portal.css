@@ -1,0 +1,308 @@
+/* ==========================================================
+   FIRST BITE — HUB & MULTI-DEVICE SIMULATION STUDIO STYLES
+   ========================================================== */
+
+.portal-body {
+    background: #0B0F19;
+    color: #F8FAFC;
+    min-height: 100vh;
+    font-family: var(--font-body);
+    overflow-x: hidden;
+}
+
+/* Header */
+.portal-header {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px 36px;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+}
+
+.portal-header-inner {
+    max-width: 1440px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.portal-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.portal-logo {
+    width: 42px;
+    height: 42px;
+    background: linear-gradient(135deg, #087F5B 0%, #10B981 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: #FFF;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+}
+
+.portal-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #FFF;
+    letter-spacing: -0.02em;
+}
+
+.portal-badge {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11.5px;
+    font-weight: 700;
+}
+
+/* Hero Section */
+.portal-hero {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 40px 36px 30px 36px;
+    text-align: center;
+}
+
+.hero-heading {
+    font-size: 38px;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin-bottom: 12px;
+    letter-spacing: -0.03em;
+}
+
+.hero-heading span {
+    background: linear-gradient(135deg, #34D399 0%, #059669 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero-subtitle {
+    font-size: 16px;
+    color: #94A3B8;
+    max-width: 720px;
+    margin: 0 auto 30px auto;
+    line-height: 1.6;
+}
+
+/* Launch Cards Grid */
+.launch-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    max-width: 1440px;
+    margin: 0 auto 40px auto;
+    padding: 0 36px;
+}
+
+@media (max-width: 1024px) {
+    .launch-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.app-launch-card {
+    background: #1E293B;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-normal);
+}
+
+.app-launch-card:hover {
+    transform: translateY(-4px);
+    border-color: #087F5B;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+}
+
+.app-launch-card.customer-card {
+    border-top: 4px solid #10B981;
+}
+
+.app-launch-card.staff-card-style {
+    border-top: 4px solid #F59E0B;
+}
+
+.app-launch-card.admin-card {
+    border-top: 4px solid #38BDF8;
+}
+
+.app-card-icon {
+    font-size: 36px;
+    margin-bottom: 16px;
+}
+
+.app-card-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #FFFFFF;
+    margin-bottom: 6px;
+}
+
+.app-card-tagline {
+    font-size: 13px;
+    color: #34D399;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.app-card-desc {
+    font-size: 13.5px;
+    color: #94A3B8;
+    line-height: 1.5;
+    margin-bottom: 24px;
+    flex: 1;
+}
+
+.app-card-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 24px;
+}
+
+.feature-pill {
+    background: #0F172A;
+    color: #CBD5E1;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid #334155;
+}
+
+.btn-launch {
+    width: 100%;
+    padding: 12px 18px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-launch.customer {
+    background: #087F5B;
+    color: #FFFFFF;
+}
+.btn-launch.customer:hover { background: #066649; }
+
+.btn-launch.staff {
+    background: #D97706;
+    color: #FFFFFF;
+}
+.btn-launch.staff:hover { background: #B45309; }
+
+.btn-launch.admin {
+    background: #0284C7;
+    color: #FFFFFF;
+}
+.btn-launch.admin:hover { background: #0369A1; }
+
+/* Interactive Live Studio Section */
+.studio-section {
+    max-width: 1600px;
+    margin: 0 auto 60px auto;
+    padding: 0 36px;
+}
+
+.studio-header {
+    background: #1E293B;
+    border: 1px solid #334155;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.studio-title-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.studio-viewport-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr 1fr;
+    gap: 16px;
+    background: #0F172A;
+    border: 1px solid #334155;
+    border-top: none;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    padding: 20px;
+    min-height: 820px;
+}
+
+@media (max-width: 1300px) {
+    .studio-viewport-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.device-frame-container {
+    display: flex;
+    flex-direction: column;
+    background: #1E293B;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1.5px solid #334155;
+}
+
+.device-frame-header {
+    background: #0F172A;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #334155;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.device-frame-header .device-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.device-iframe {
+    width: 100%;
+    height: 750px;
+    border: none;
+    background: #FFFFFF;
+}
+
+/* Supabase status drawer */
+.supabase-live-status-bar {
+    max-width: 1440px;
+    margin: 0 auto 40px auto;
+    padding: 16px 24px;
+    background: #1E293B;
+    border-radius: var(--radius-md);
+    border: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 14px;
+}

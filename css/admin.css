@@ -1,0 +1,423 @@
+/* ==========================================================
+   FIRST BITE — ADMIN & OWNER SAAS DASHBOARD STYLES
+   Professional White + Deep Emerald, Metrics, CRUD Tables
+   ========================================================== */
+
+.admin-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-soft);
+}
+
+/* Sidebar */
+.admin-sidebar {
+    width: 260px;
+    background: #FFFFFF;
+    border-right: 1px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    z-index: 50;
+}
+
+.sidebar-header {
+    padding: 24px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.brand-badge {
+    width: 38px;
+    height: 38px;
+    background: var(--primary);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: #FFFFFF;
+}
+
+.brand-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.brand-subtitle {
+    font-size: 11px;
+    color: var(--primary);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sidebar-nav {
+    padding: 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 13.5px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.sidebar-link:hover {
+    background: var(--bg-soft);
+    color: var(--text-primary);
+}
+
+.sidebar-link.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+}
+
+.realtime-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    color: #047857;
+    font-weight: 600;
+    background: #ECFDF5;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+}
+
+/* Main Content Area */
+.admin-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+}
+
+.admin-topbar {
+    background: #FFFFFF;
+    border-bottom: 1px solid var(--border-light);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+
+.topbar-title-box h1 {
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.topbar-title-box p {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.admin-content-view {
+    padding: 28px 32px;
+    display: none;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.admin-content-view.active {
+    display: flex;
+}
+
+/* Dashboard Metric Cards */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.metric-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-xs);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--primary);
+    opacity: 0.8;
+}
+
+.metric-icon-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+
+.metric-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.metric-value {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+}
+
+.metric-trend {
+    font-size: 12px;
+    font-weight: 600;
+    color: #16A34A;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Dashboard 2-column layout */
+.dashboard-grid-2 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+}
+
+@media (max-width: 1080px) {
+    .dashboard-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.card-panel {
+    background: #FFFFFF;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-xs);
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.panel-title {
+    font-size: 16px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Top items list */
+.top-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.top-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.top-item-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.item-rank-num {
+    width: 24px;
+    font-weight: 800;
+    color: var(--text-muted);
+}
+
+.top-item-name {
+    font-size: 13.5px;
+    font-weight: 700;
+}
+
+.top-item-orders {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+}
+
+.top-item-revenue {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+/* Data Tables */
+.table-container {
+    background: #FFFFFF;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xs);
+    overflow: hidden;
+}
+
+.table-toolbar {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px solid var(--border-light);
+    flex-wrap: wrap;
+}
+
+.table-search-box {
+    flex: 1;
+    min-width: 240px;
+    position: relative;
+}
+
+.table-search-box input {
+    width: 100%;
+    padding-left: 36px;
+}
+
+.table-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    text-align: left;
+}
+
+.data-table th {
+    background: var(--bg-soft);
+    padding: 12px 18px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.data-table td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+}
+
+.data-table tr:hover td {
+    background: #FAFAFA;
+}
+
+.table-action-btn {
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+}
+
+.table-action-btn:hover {
+    background: #FFFFFF;
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Receipt / Print Modal */
+.receipt-paper {
+    background: #FFF;
+    border: 1px dashed #D1D5DB;
+    padding: 24px;
+    font-family: monospace;
+    font-size: 13px;
+    color: #111;
+    max-width: 360px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-sm);
+}
+
+.receipt-header {
+    text-align: center;
+    border-bottom: 1px dashed #333;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+.receipt-item-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0;
+}
+
+.receipt-total-row {
+    border-top: 1px dashed #333;
+    padding-top: 8px;
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+}

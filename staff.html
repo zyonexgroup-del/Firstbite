@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>First Bite — Kitchen & Staff Terminal</title>
+    <meta name="description" content="High-speed mobile kitchen display system and staff order processing terminal for First Bite.">
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/staff.css">
+</head>
+<body class="staff-body">
+
+    <!-- ─── TOP NAVBAR ─────────────────────────────────────── -->
+    <header class="staff-navbar">
+        <div class="staff-brand">
+            <div class="staff-logo-icon">FB</div>
+            <div>
+                <h1 class="staff-title">FIRST BITE</h1>
+                <span class="staff-role-badge">Kitchen Terminal</span>
+            </div>
+        </div>
+
+        <div class="staff-nav-actions">
+            <button class="kitchen-status-btn" id="kitchen-status-btn" title="Toggle Kitchen Accepting Orders">
+                <span class="status-indicator-dot" id="kitchen-status-dot"></span>
+                <span id="kitchen-status-text">Open</span>
+            </button>
+            <div class="realtime-pill" style="background:#064E3B;color:#6EE7B7;border:1px solid #047857;font-size:10px;padding:4px 8px;">
+                <span class="pulse-dot" style="width:6px;height:6px;"></span>
+                <span class="btn-label">Live</span>
+            </div>
+            <button class="sound-toggle-btn" id="sound-toggle-btn" title="Toggle sound">
+                🔊 <span class="btn-label">Sound</span>
+            </button>
+            <button class="menu-stock-btn" id="open-stock-btn" title="Item Stock Control">
+                📋 <span class="btn-label">Stock</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ─── LIVE STATS BAR ─────────────────────────────────── -->
+    <section class="staff-stats-bar">
+        <div class="stat-pill-card">
+            <div>
+                <div class="stat-pill-label">New</div>
+                <div class="stat-pill-count accent-new" id="stat-count-new">0</div>
+            </div>
+            <span style="font-size:20px;">🔔</span>
+        </div>
+        <div class="stat-pill-card">
+            <div>
+                <div class="stat-pill-label">Prep</div>
+                <div class="stat-pill-count accent-prep" id="stat-count-prep">0</div>
+            </div>
+            <span style="font-size:20px;">👨‍🍳</span>
+        </div>
+        <div class="stat-pill-card">
+            <div>
+                <div class="stat-pill-label">Ready</div>
+                <div class="stat-pill-count accent-ready" id="stat-count-ready">0</div>
+            </div>
+            <span style="font-size:20px;">📦</span>
+        </div>
+        <div class="stat-pill-card">
+            <div>
+                <div class="stat-pill-label">Done</div>
+                <div class="stat-pill-count" id="stat-count-served" style="color:#94A3B8;">0</div>
+            </div>
+            <span style="font-size:20px;">✅</span>
+        </div>
+    </section>
+
+    <!-- ─── SEARCH ─────────────────────────────────────────── -->
+    <div class="staff-search-bar">
+        <input type="text" id="staff-search-input" placeholder="🔍 Search order #, customer, table...">
+    </div>
+
+    <!-- ─── MOBILE COLUMN VIEWS ────────────────────────────── -->
+    <!-- NEW ORDERS column -->
+    <section class="staff-column-view col-new active" id="view-new" data-col="new">
+        <div class="column-header">
+            <span class="column-title">🔔 New Orders</span>
+            <span class="col-count-badge" id="col-badge-new">0</span>
+        </div>
+        <div id="mobile-list-new">
+            <!-- injected -->
+        </div>
+    </section>
+
+    <!-- PREPARING column -->
+    <section class="staff-column-view col-prep" id="view-preparing" data-col="preparing">
+        <div class="column-header">
+            <span class="column-title">👨‍🍳 Preparing</span>
+            <span class="col-count-badge" id="col-badge-prep">0</span>
+        </div>
+        <div id="mobile-list-prep">
+            <!-- injected -->
+        </div>
+    </section>
+
+    <!-- READY column -->
+    <section class="staff-column-view col-ready" id="view-ready" data-col="ready">
+        <div class="column-header">
+            <span class="column-title">📦 Ready</span>
+            <span class="col-count-badge" id="col-badge-ready">0</span>
+        </div>
+        <div id="mobile-list-ready">
+            <!-- injected -->
+        </div>
+    </section>
+
+    <!-- HISTORY column -->
+    <section class="staff-column-view col-history" id="view-history" data-col="history">
+        <div class="column-header">
+            <span class="column-title">📜 Order History</span>
+            <span class="col-count-badge" id="col-badge-history" style="background:rgba(167,139,250,0.15);color:#A78BFA;">0</span>
+        </div>
+        <div id="mobile-list-history">
+            <!-- injected -->
+        </div>
+    </section>
+
+    <!-- ─── DESKTOP 3-COLUMN KANBAN (≥900px) ──────────────── -->
+    <div class="staff-desktop-kanban" id="desktop-kanban">
+        <div class="kanban-col col-new">
+            <div class="kanban-header">
+                <span class="kanban-title">🔔 New Orders</span>
+                <span style="background:rgba(245,158,11,0.15);color:#F59E0B;font-weight:800;padding:3px 10px;border-radius:20px;font-size:12px;" id="kanban-badge-new">0</span>
+            </div>
+            <div class="kanban-cards-list" id="kanban-list-new"></div>
+        </div>
+        <div class="kanban-col col-prep">
+            <div class="kanban-header">
+                <span class="kanban-title">👨‍🍳 Preparing</span>
+                <span style="background:rgba(56,189,248,0.15);color:#38BDF8;font-weight:800;padding:3px 10px;border-radius:20px;font-size:12px;" id="kanban-badge-prep">0</span>
+            </div>
+            <div class="kanban-cards-list" id="kanban-list-prep"></div>
+        </div>
+        <div class="kanban-col col-ready">
+            <div class="kanban-header">
+                <span class="kanban-title">📦 Ready for Service</span>
+                <span style="background:rgba(74,222,128,0.15);color:#4ADE80;font-weight:800;padding:3px 10px;border-radius:20px;font-size:12px;" id="kanban-badge-ready">0</span>
+            </div>
+            <div class="kanban-cards-list" id="kanban-list-ready-desk"></div>
+        </div>
+    </div>
+
+    <!-- ─── MOBILE BOTTOM NAVIGATION ─────────────────────── -->
+    <nav class="staff-bottom-nav">
+        <button class="staff-nav-tab active" data-tab="new">
+            <span class="nav-tab-icon">🔔</span>
+            <span>New</span>
+            <span class="tab-badge-dot" id="badge-new-tab">0</span>
+        </button>
+        <button class="staff-nav-tab" data-tab="preparing">
+            <span class="nav-tab-icon">👨‍🍳</span>
+            <span>Prep</span>
+            <span class="tab-badge-dot" id="badge-prep-tab" style="display:none;">0</span>
+        </button>
+        <button class="staff-nav-tab" data-tab="ready">
+            <span class="nav-tab-icon">📦</span>
+            <span>Ready</span>
+            <span class="tab-badge-dot" id="badge-ready-tab" style="display:none;">0</span>
+        </button>
+        <button class="staff-nav-tab" data-tab="history">
+            <span class="nav-tab-icon">📜</span>
+            <span>History</span>
+        </button>
+    </nav>
+
+    <!-- ─── MENU STOCK MODAL (WHITE THEME) ─────────────────── -->
+    <div class="modal-overlay" id="menu-stock-modal">
+        <div class="modal-card" style="background:#FFFFFF;border:1px solid #E2E8F0;color:#0F172A;max-width:500px;box-shadow:0 10px 25px rgba(0,0,0,0.1);">
+            <div class="flex-between" style="padding:18px 22px;border-bottom:1px solid #E2E8F0;">
+                <div>
+                    <h3 style="font-size:16px;font-weight:800;color:#0F172A;">Item Stock (86'd Control)</h3>
+                    <p style="font-size:12px;color:#64748B;margin-top:3px;">Toggle off to immediately mark an item Out of Stock for customers</p>
+                </div>
+                <button class="sound-toggle-btn" id="stock-modal-close-btn" style="width:32px;height:32px;border-radius:50%;padding:0;justify-content:center;">✕</button>
+            </div>
+            <div style="padding:16px 22px;max-height:65vh;overflow-y:auto;">
+                <div class="stock-toggle-list" id="stock-items-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── CANCEL ORDER CONFIRMATION MODAL ────────────────── -->
+    <div class="modal-overlay" id="cancel-order-modal">
+        <div class="modal-card" style="background:#FFFFFF;border:1px solid #E2E8F0;color:#0F172A;max-width:440px;box-shadow:0 12px 30px rgba(0,0,0,0.12);">
+            <div class="flex-between" style="padding:18px 22px;border-bottom:1px solid #E2E8F0;">
+                <div>
+                    <h3 style="font-size:17px;font-weight:800;color:#DC2626;">Cancel / Decline Order</h3>
+                    <p style="font-size:12px;color:#64748B;margin-top:2px;">Order <span id="cancel-modal-ordernum" style="font-weight:800;color:#0F172A;"></span></p>
+                </div>
+                <button class="sound-toggle-btn" id="cancel-modal-close-btn" style="width:32px;height:32px;border-radius:50%;padding:0;justify-content:center;">✕</button>
+            </div>
+            <div style="padding:18px 22px;">
+                <label style="font-size:12.5px;font-weight:700;color:#475569;display:block;margin-bottom:8px;">Reason for Cancellation:</label>
+                <select id="cancel-reason-select" style="width:100%;margin-bottom:12px;padding:10px 12px;border-radius:8px;border:1.5px solid #CBD5E1;font-size:13.5px;background:#FFF;color:#0F172A;">
+                    <option value="Item(s) out of stock">Item(s) out of stock / 86'd</option>
+                    <option value="Kitchen too busy / Long wait time">Kitchen too busy / Long wait time</option>
+                    <option value="Customer requested cancellation">Customer requested cancellation</option>
+                    <option value="Restaurant closing soon">Restaurant closing soon</option>
+                    <option value="Duplicate order">Duplicate order</option>
+                    <option value="Other reason">Other reason</option>
+                </select>
+                <input type="text" id="cancel-custom-reason" placeholder="Optional details (e.g. out of burger buns)..." style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid #CBD5E1;font-size:13.5px;margin-bottom:18px;background:#FFF;color:#0F172A;">
+
+                <div style="display:flex;gap:10px;">
+                    <button class="btn-secondary" id="cancel-modal-back-btn" style="flex:1;height:42px;">Keep Order</button>
+                    <button class="btn-primary" id="cancel-modal-confirm-btn" style="flex:1.2;height:42px;background:#DC2626;border-color:#DC2626;">Confirm Cancel ✕</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/sound-effects.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/staff.js"></script>
+</body>
+</html>

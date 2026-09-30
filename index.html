@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>First Bite — Gourmet Dining & Ordering</title>
+    <meta name="description" content="Experience premium food ordering with First Bite. Fast, seamless, handcrafted gourmet meals delivered straight to your table or for takeaway.">
+
+    <!-- Design Tokens & Styles -->
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/customer.css">
+</head>
+<body>
+
+    <!-- Confetti Canvas for celebrations -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Main Customer Viewport (Mobile-First Frame) -->
+    <div class="customer-viewport">
+
+        <!-- Closed Kitchen Alert Banner -->
+        <div id="kitchen-closed-banner" style="display: none; background: #FEE2E2; color: #991B1B; padding: 11px 16px; text-align: center; font-weight: 700; font-size: 13px; border-bottom: 1px solid #FECACA; position: sticky; top: 0; z-index: 100;">
+            ⚠️ Kitchen is currently paused / closed. We are not accepting new orders right now.
+        </div>
+
+        <!-- Top Header -->
+        <header class="customer-header">
+            <div class="header-top">
+                <div>
+                    <div class="greeting-text" id="user-greeting">Good evening 👋</div>
+                    <h1 class="restaurant-title" id="restaurant-name">First Bite Bistro</h1>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="status-pill" id="restaurant-status">
+                        <span class="pulse-dot" style="width: 6px; height: 6px;"></span> Open Now
+                    </div>
+                    <button class="header-cart-btn" id="header-cart-btn" title="View Cart">
+                        <span style="font-size: 16px;">🛒</span>
+                        <span class="header-cart-badge" id="header-cart-count" style="display: none;">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="restaurant-meta">
+                <span class="rating-badge" id="restaurant-rating">★ 4.8</span>
+                <span>• Gourmet Kitchen</span>
+                <span>• Dine-in & Takeaway</span>
+            </div>
+        </header>
+
+        <!-- VIEW: HOME & MENU -->
+        <main id="view-home">
+            <!-- Search Bar -->
+            <div class="search-container">
+                <div class="search-input-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="main-search-input" placeholder="Search mouthwatering dishes, cuisines...">
+                    <button class="clear-search-btn" id="clear-search-btn">✕</button>
+                </div>
+            </div>
+
+            <!-- Categories Slider -->
+            <div class="categories-slider" id="categories-slider">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Dietary Filter Chips -->
+            <div class="diet-filter-row">
+                <button class="diet-chip active" data-diet="all">All Dishes</button>
+                <button class="diet-chip" data-diet="veg">
+                    <span class="diet-icon veg"></span> Pure Veg
+                </button>
+                <button class="diet-chip" data-diet="non-veg">
+                    <span class="diet-icon non-veg"></span> Non-Veg
+                </button>
+            </div>
+
+            <!-- Popular Today Section -->
+            <section id="popular-section">
+                <div class="section-header">
+                    <h2 class="section-title">Popular Today 🔥</h2>
+                    <span class="section-subtitle">Customer Favorites</span>
+                </div>
+                <div class="food-list" id="popular-dishes-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </section>
+
+            <!-- All Menu Dishes Section -->
+            <section>
+                <div class="section-header">
+                    <h2 class="section-title">Explore Full Menu 🍽️</h2>
+                    <span class="section-subtitle">Freshly prepared to order</span>
+                </div>
+                <div class="food-list" id="main-menu-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </section>
+        </main>
+
+        <!-- VIEW: ORDERS HISTORY -->
+        <section id="view-orders" style="display: none; padding: 20px;">
+            <div class="section-header" style="padding: 0 0 16px 0;">
+                <h2 class="section-title">My Orders 📜</h2>
+                <span class="section-subtitle">Past & Active</span>
+            </div>
+            <div id="orders-history-list">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- VIEW: FAVORITES -->
+        <section id="view-favorites" style="display: none; padding: 20px;">
+            <div class="section-header" style="padding: 0 0 16px 0;">
+                <h2 class="section-title">Saved Favorites ❤️</h2>
+                <span class="section-subtitle">Quick 1-tap reordering</span>
+            </div>
+            <div class="food-list" id="favorites-list" style="padding: 0;">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- Floating Sticky Cart Bar -->
+        <div class="floating-cart-bar" id="floating-cart-bar">
+            <div class="cart-bar-left">
+                <span class="cart-bar-count-badge" id="cart-bar-count">0 items</span>
+                <span class="cart-bar-total" id="cart-bar-total">₹0</span>
+            </div>
+            <div class="cart-bar-right">
+                <span>VIEW CART</span>
+                <span>→</span>
+            </div>
+        </div>
+
+        <!-- Mobile Bottom Navigation -->
+        <nav class="bottom-nav">
+            <button class="nav-tab active" data-tab="home" id="nav-home-tab">
+                <span class="nav-icon">🏠</span>
+                <span>Home</span>
+            </button>
+            <button class="nav-tab" data-tab="search" id="nav-search-tab">
+                <span class="nav-icon">🔍</span>
+                <span>Search</span>
+            </button>
+            <button class="nav-tab" data-tab="orders" id="nav-orders-tab">
+                <span class="nav-icon">📜</span>
+                <span>Orders</span>
+            </button>
+            <button class="nav-tab" data-tab="favorites" id="nav-fav-tab">
+                <span class="nav-icon">❤️</span>
+                <span>Saved</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- MODALS & BOTTOM SHEETS                                   -->
+    <!-- ======================================================== -->
+
+    <!-- Food Item Detail Bottom Sheet -->
+    <div class="bottom-sheet-overlay" id="item-detail-sheet">
+        <div class="bottom-sheet-content">
+            <div class="bottom-sheet-handle"></div>
+            <div style="position: relative;">
+                <img id="sheet-hero-img" src="" alt="" class="sheet-hero-image">
+                <button class="btn-secondary" id="sheet-close-btn" style="position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; padding: 0; background: rgba(255,255,255,0.9); font-weight: 800;">✕</button>
+            </div>
+
+            <div class="sheet-body">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <span id="sheet-diet-icon" class="diet-icon veg"></span>
+                    <h2 id="sheet-food-name" class="sheet-food-title">Food Name</h2>
+                </div>
+                <div id="sheet-food-price" class="sheet-food-price">₹0</div>
+                <p id="sheet-food-desc" class="sheet-food-desc">Description of the food item</p>
+
+                <!-- Customization / Add-ons -->
+                <div id="sheet-addons-container" class="addons-section">
+                    <h4 class="addons-title">Enhance Your Dish (Optional Add-ons)</h4>
+                    <div id="sheet-addons-list">
+                        <!-- Addon checkboxes populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="sheet-footer">
+                <div class="quantity-stepper">
+                    <button class="stepper-btn" id="sheet-qty-minus">-</button>
+                    <span class="stepper-val" id="sheet-qty-val">1</span>
+                    <button class="stepper-btn" id="sheet-qty-plus">+</button>
+                </div>
+                <button class="btn-primary sheet-add-btn" id="sheet-submit-add-btn">
+                    ADD TO CART • ₹0
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full Cart Drawer / Modal -->
+    <div class="bottom-sheet-overlay" id="cart-drawer-modal">
+        <div class="bottom-sheet-content" style="max-height: 90vh;">
+            <div class="bottom-sheet-handle"></div>
+            <div class="flex-between" style="padding: 14px 20px; border-bottom: 1px solid var(--border-light);">
+                <h3 style="font-size: 17px; font-weight: 800;">Your Cart 🛒</h3>
+                <button class="btn-secondary" id="cart-close-btn" style="width: 32px; height: 32px; border-radius: 50%; padding: 0;">✕</button>
+            </div>
+
+            <div style="padding: 0 20px; overflow-y: auto; flex: 1;">
+                <!-- Empty Cart State -->
+                <div id="cart-empty-state" style="text-align: center; padding: 50px 20px; color: var(--text-muted); display: none;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">🛍️</div>
+                    <p style="font-weight: 700; font-size: 16px; color: var(--text-primary);">Your cart is empty</p>
+                    <p style="font-size: 13px;">Add some delicious dishes from our menu!</p>
+                </div>
+
+                <!-- Items list -->
+                <div class="cart-items-list" id="cart-items-container">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Bill & Promo Section -->
+                <div id="cart-bill-section">
+                    <!-- Promo code -->
+                    <div style="display: flex; gap: 8px; margin-top: 10px;">
+                        <input type="text" id="promo-input" placeholder="Promo code (e.g. FIRSTBITE20)" style="flex: 1; text-transform: uppercase;">
+                        <button class="btn-secondary" id="apply-promo-btn" style="padding: 10px 14px; font-size: 13px;">Apply</button>
+                    </div>
+                    <div id="promo-hint-pills" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+                        <!-- Dynamic promo chips -->
+                    </div>
+
+                    <div class="bill-breakdown">
+                        <div class="bill-row">
+                            <span>Item Subtotal</span>
+                            <span id="bill-subtotal">₹0</span>
+                        </div>
+                        <div class="bill-row">
+                            <span id="bill-tax-label">GST & Taxes (5%)</span>
+                            <span id="bill-tax">₹0</span>
+                        </div>
+                        <div class="bill-row" id="bill-discount-row" style="color: #16A34A; display: none;">
+                            <span>Promo Discount</span>
+                            <span id="bill-discount">- ₹0</span>
+                        </div>
+                        <div class="bill-row total">
+                            <span>Grand Total</span>
+                            <span id="bill-total" style="color: var(--primary);">₹0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 14px 20px 20px 20px; border-top: 1px solid var(--border-light);">
+                <button class="btn-primary" id="cart-checkout-btn" style="width: 100%; height: 46px; font-size: 15px;">
+                    Proceed to Checkout →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div class="modal-overlay" id="checkout-modal">
+        <div class="modal-card">
+            <div class="flex-between" style="padding: 18px 22px; border-bottom: 1px solid var(--border-light);">
+                <h3 style="font-size: 17px; font-weight: 800;">Order Details 🍽️</h3>
+                <button class="btn-secondary" id="checkout-close-btn" style="width: 32px; height: 32px; border-radius: 50%; padding: 0;">✕</button>
+            </div>
+
+            <div style="padding: 20px 22px; display: flex; flex-direction: column; gap: 16px;">
+                <!-- Dining Type Toggle -->
+                <div>
+                    <label style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 8px;">Order Type</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1.5px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer;">
+                            <input type="radio" name="order_type" value="dine_in" checked accent-color="#087F5B">
+                            <span style="font-weight: 600; font-size: 13.5px;">🍽️ Dine-in</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1.5px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer;">
+                            <input type="radio" name="order_type" value="takeaway" accent-color="#087F5B">
+                            <span style="font-weight: 600; font-size: 13.5px;">🛍️ Takeaway</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Table selector for Dine-in -->
+                <div id="table-select-group">
+                    <label style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Select Table Number</label>
+                    <select id="checkout-table-select" style="width: 100%;">
+                        <option value="Table 1">Table 1 (Window View)</option>
+                        <option value="Table 2">Table 2</option>
+                        <option value="Table 3">Table 3</option>
+                        <option value="Table 4" selected>Table 4</option>
+                        <option value="Table 5">Table 5 (Booth)</option>
+                        <option value="Table 6">Table 6</option>
+                        <option value="Table 7">Table 7</option>
+                        <option value="Table 8">Table 8 (Terrace)</option>
+                    </select>
+                </div>
+
+                <!-- Contact Info -->
+                <div>
+                    <label style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Your Name</label>
+                    <input type="text" id="checkout-name" placeholder="e.g. Rahul Sharma" style="width: 100%;">
+                </div>
+
+                <div>
+                    <label style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Phone Number (Optional for SMS / updates)</label>
+                    <input type="tel" id="checkout-phone" placeholder="e.g. +91 98765 43210" style="width: 100%;">
+                </div>
+
+                <div>
+                    <label style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Cooking Instructions</label>
+                    <textarea id="checkout-instructions" placeholder="e.g. Extra spicy, no onions, sauce on the side..." rows="2" style="width: 100%; resize: none;"></textarea>
+                </div>
+
+                <!-- Payment Method -->
+                <div>
+                    <label style="font-size: 12.5px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 8px;">Payment Option</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1.5px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="radio" name="payment_method" value="online" checked accent-color="#087F5B">
+                                <span style="font-weight: 600; font-size: 13.5px;">💳 Instant Online Payment (UPI / Card / NetBanking)</span>
+                            </div>
+                            <span class="badge badge-green">Instant</span>
+                        </label>
+                        <label style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1.5px solid var(--border-light); border-radius: var(--radius-md); cursor: pointer;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="radio" name="payment_method" value="cash" accent-color="#087F5B">
+                                <span style="font-weight: 600; font-size: 13.5px;">💵 Cash / Pay at Counter</span>
+                            </div>
+                            <span class="badge badge-gray">Pay Later</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 16px 22px; border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-size: 11.5px; color: var(--text-secondary);">Total Payable</div>
+                    <div style="font-size: 18px; font-weight: 800; color: var(--primary);" id="checkout-pay-total">₹0</div>
+                </div>
+                <button class="btn-primary" id="checkout-submit-btn" style="padding: 12px 28px; font-size: 15px;">
+                    Place Order 🎉
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulated Online Payment Modal -->
+    <div class="modal-overlay" id="payment-gateway-modal">
+        <div class="modal-card" style="text-align: center; padding: 28px 24px; max-width: 380px;">
+            <div style="font-size: 38px; margin-bottom: 8px;">💳</div>
+            <h3 style="font-size: 18px; font-weight: 800; margin-bottom: 6px;">Secure Online Checkout</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                Paying <b id="gateway-pay-amount" style="color: var(--primary);">₹0</b> via UPI / QR Gateway
+            </p>
+
+            <div style="background: var(--bg-soft); padding: 16px; border-radius: var(--radius-md); margin-bottom: 16px; border: 1px dashed var(--border-light);">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=upi://pay?pa=firstbite@upi&pn=FirstBiteBistro" alt="UPI QR" style="width: 130px; height: 130px; border-radius: 8px; margin: 0 auto; display: block;">
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Scan & pay with any UPI App (GPay, PhonePe, Paytm)</p>
+            </div>
+
+            <div style="background: #E5E7EB; border-radius: 6px; height: 6px; overflow: hidden; margin-bottom: 12px;">
+                <div id="gateway-progress-bar" style="background: var(--primary); height: 100%; width: 0%; transition: width 0.3s linear;"></div>
+            </div>
+            <p style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Verifying payment status in real time...</p>
+        </div>
+    </div>
+
+    <!-- Live Order Tracker Modal -->
+    <div class="modal-overlay" id="order-tracker-modal">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="tracker-header">
+                <span class="order-badge-pill" id="tracker-order-num">#FB-1045</span>
+                <div id="tracker-order-type" style="font-size: 13.5px; font-weight: 700; color: var(--primary-hover); margin-bottom: 4px;">
+                    🍽️ Dine-in • Table 4
+                </div>
+                <div class="tracker-time-estimate" id="tracker-estimate-text">
+                    Kitchen is reviewing your order...
+                </div>
+            </div>
+
+            <!-- Cancelled Order Banner Container -->
+            <div id="tracker-cancelled-alert" style="display:none; padding:16px 20px; background:#FEF2F2; border-bottom:1.5px solid #FECACA; text-align:center;">
+                <div style="font-size:36px; margin-bottom:4px;">❌</div>
+                <div style="font-weight:800; font-size:16px; color:#DC2626;">Order Cancelled by Kitchen</div>
+                <div id="tracker-cancel-reason-text" style="font-size:13px; color:#4B5563; margin-top:6px; line-height:1.4;"></div>
+                <div style="display:flex; gap:8px; justify-content:center; margin-top:14px;">
+                    <button class="btn-secondary" id="tracker-cancel-dismiss-btn" style="font-size:12.5px; padding:7px 14px; background:#FFF;">Dismiss</button>
+                    <button class="btn-primary" id="tracker-cancel-reorder-btn" style="font-size:12.5px; padding:7px 16px; background:#DC2626; border-color:#DC2626; color:#FFF;">Choose New Items</button>
+                </div>
+            </div>
+
+            <!-- Animated Status Stepper -->
+            <div class="status-stepper" id="tracker-status-stepper">
+                <!-- Step 1: Placed -->
+                <div class="status-step completed" id="step-placed">
+                    <div class="step-connector"></div>
+                    <div class="step-node">✓</div>
+                    <div class="step-info">
+                        <div class="step-title">Order Placed</div>
+                        <div class="step-desc">Received by restaurant system</div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Accepted -->
+                <div class="status-step" id="step-accepted">
+                    <div class="step-connector"></div>
+                    <div class="step-node">✓</div>
+                    <div class="step-info">
+                        <div class="step-title">Order Accepted</div>
+                        <div class="step-desc">Kitchen confirmed your ticket</div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Preparing -->
+                <div class="status-step" id="step-preparing">
+                    <div class="step-connector"></div>
+                    <div class="step-node">👨‍🍳</div>
+                    <div class="step-info">
+                        <div class="step-title">Cooking in Kitchen</div>
+                        <div class="step-desc">Chef is crafting your fresh order</div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Ready -->
+                <div class="status-step" id="step-ready">
+                    <div class="step-connector"></div>
+                    <div class="step-node">🎉</div>
+                    <div class="step-info">
+                        <div class="step-title">Ready for You!</div>
+                        <div class="step-desc">Pick up at counter or table service arriving</div>
+                    </div>
+                </div>
+
+                <!-- Step 5: Completed -->
+                <div class="status-step" id="step-completed">
+                    <div class="step-node">★</div>
+                    <div class="step-info">
+                        <div class="step-title">Order Served & Complete</div>
+                        <div class="step-desc">Bon appétit! Enjoy your meal</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Items brief summary -->
+            <div style="padding: 16px 20px; background: var(--bg-soft); border-top: 1px solid var(--border-light);">
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Order Summary</div>
+                <div id="tracker-items-list">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="flex-between" style="border-top: 1px dashed var(--border-light); padding-top: 8px; margin-top: 8px; font-weight: 800;">
+                    <span>Total Amount</span>
+                    <span id="tracker-total-amount" style="color: var(--primary);">₹0</span>
+                </div>
+            </div>
+
+            <div style="padding: 14px 20px 20px 20px; display: flex; gap: 10px;">
+                <button class="btn-secondary" id="tracker-close-btn" style="flex: 1;">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/sound-effects.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/customer.js"></script>
+</body>
+</html>

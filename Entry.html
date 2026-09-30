@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>First Bite — Restaurant Ordering & Management Platform</title>
+    <meta name="description" content="One platform. Three experiences. Real-time restaurant operations with Customer App, Staff App, and Admin App powered by Supabase.">
+
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/portal.css">
+</head>
+<body class="portal-body">
+
+    <!-- Top Navigation -->
+    <header class="portal-header">
+        <div class="portal-header-inner">
+            <div class="portal-brand">
+                <div class="portal-logo">FB</div>
+                <div>
+                    <h1 class="portal-title">FIRST BITE</h1>
+                    <span style="font-size: 11.5px; color: #94A3B8; font-weight: 500;">Restaurant Operations Platform</span>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div class="realtime-pill" style="background: rgba(16, 185, 129, 0.12); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                    <span class="pulse-dot"></span>
+                    <span>Supabase Realtime Live</span>
+                </div>
+                <span class="portal-badge">Sub-Second Sync</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="portal-hero">
+        <h2 class="hero-heading">One Platform. Three Experiences.<br><span>Real-Time Restaurant Operations.</span></h2>
+        <p class="hero-subtitle">
+            First Bite replaces manual ordering and disconnected terminals with three beautifully crafted, synchronized applications. Place an order on the phone, manage it in the kitchen, and track metrics in the executive suite.
+        </p>
+    </section>
+
+    <!-- 3 Application Launch Cards -->
+    <section class="launch-cards-grid">
+        <!-- 1. Customer App Card -->
+        <div class="app-launch-card customer-card">
+            <div class="app-card-icon">📱</div>
+            <h3 class="app-card-title">Customer App</h3>
+            <div class="app-card-tagline">"Order beautifully."</div>
+            <p class="app-card-desc">
+                Mobile-first ordering with mouthwatering food photography, add-ons customizer, floating cart bar, and live animated status tracking.
+            </p>
+
+            <div class="app-card-features">
+                <span class="feature-pill">Mobile-First</span>
+                <span class="feature-pill">Dietary Filters</span>
+                <span class="feature-pill">Add-ons Modal</span>
+                <span class="feature-pill">Floating Cart</span>
+                <span class="feature-pill">Live Tracking</span>
+                <span class="feature-pill">Confetti Celebration</span>
+            </div>
+
+            <a href="customer.html" target="_blank" class="btn-launch customer">
+                <span>Launch Customer App</span>
+                <span>↗</span>
+            </a>
+        </div>
+
+        <!-- 2. Staff App Card -->
+        <div class="app-launch-card staff-card-style">
+            <div class="app-card-icon">👨‍🍳</div>
+            <h3 class="app-card-title">Kitchen & Staff App</h3>
+            <div class="app-card-tagline" style="color: #FBBF24;">"Manage orders instantly."</div>
+            <p class="app-card-desc">
+                High-contrast kitchen display system (KDS) with sound chime alerts, elapsed time tickers, one-click ticket progression, and stock toggles.
+            </p>
+
+            <div class="app-card-features">
+                <span class="feature-pill">High Contrast KDS</span>
+                <span class="feature-pill">Audible Chime Alerts</span>
+                <span class="feature-pill">Live Kanban Board</span>
+                <span class="feature-pill">Elapsed Timers</span>
+                <span class="feature-pill">Menu Stock (86'd)</span>
+                <span class="feature-pill">Cash Collection</span>
+            </div>
+
+            <a href="staff.html" target="_blank" class="btn-launch staff">
+                <span>Launch Staff App</span>
+                <span>↗</span>
+            </a>
+        </div>
+
+        <!-- 3. Admin App Card -->
+        <div class="app-launch-card admin-card">
+            <div class="app-card-icon">👑</div>
+            <h3 class="app-card-title">Owner & Admin App</h3>
+            <div class="app-card-tagline" style="color: #38BDF8;">"Control digitally."</div>
+            <p class="app-card-desc">
+                Professional SaaS management dashboard with sales trajectory charts, orders master table, full menu catalog CRUD, and thermal receipt printing.
+            </p>
+
+            <div class="app-card-features">
+                <span class="feature-pill">SaaS Analytics</span>
+                <span class="feature-pill">7-Day Sales Chart</span>
+                <span class="feature-pill">Orders Master Log</span>
+                <span class="feature-pill">Menu CRUD</span>
+                <span class="feature-pill">Categories</span>
+                <span class="feature-pill">POS Receipt Print</span>
+            </div>
+
+            <a href="admin.html" target="_blank" class="btn-launch admin">
+                <span>Launch Admin Dashboard</span>
+                <span>↗</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- Supabase Status & Telemetry Bar -->
+    <div class="supabase-live-status-bar">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">⚡</span>
+            <div>
+                <b>Supabase Connection:</b>
+                <span style="color: #94A3B8; font-family: monospace; font-size: 12px; margin-left: 6px;">https://otohichqlyanmddwgofm.supabase.co</span>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <div>
+                <span style="color: #94A3B8;">Realtime Latency:</span>
+                <b id="supabase-latency-val" style="color: #34D399; margin-left: 4px;">18 ms</b>
+            </div>
+            <div>
+                <span style="color: #94A3B8;">PostgreSQL Schema:</span>
+                <a href="schema.sql" target="_blank" style="color: #38BDF8; font-weight: 700; text-decoration: none; margin-left: 4px;">schema.sql ↗</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive 3-App Live Studio -->
+    <section class="studio-section">
+        <div class="studio-header">
+            <div class="studio-title-box">
+                <span style="font-size: 24px;">🎛️</span>
+                <div>
+                    <h3 style="font-size: 17px; font-weight: 800; color: #FFF;">Live Multi-Device Interactive Studio</h3>
+                    <p id="studio-live-feed-msg" style="font-size: 12px; color: #94A3B8;">
+                        Order on the phone view below, and watch it chime and pop up in the Kitchen & Admin screens in milliseconds!
+                    </p>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-primary" id="simulate-order-btn" style="background: #10B981; padding: 10px 18px; font-size: 13px;">
+                    ⚡ Trigger Instant Test Order
+                </button>
+                <button class="btn-secondary" id="reload-frames-btn" style="background: #334155; color: #FFF; border-color: #475569; padding: 10px 14px; font-size: 13px;">
+                    🔄 Reload All
+                </button>
+                <button class="btn-secondary" id="reset-demo-btn" style="background: #334155; color: #FCA5A5; border-color: #475569; padding: 10px 14px; font-size: 13px;">
+                    🗑️ Reset Data
+                </button>
+            </div>
+        </div>
+
+        <div class="studio-viewport-grid">
+            <!-- Viewport 1: Customer Phone -->
+            <div class="device-frame-container">
+                <div class="device-frame-header">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="device-dot" style="background: #10B981;"></span>
+                        <span>📱 Customer App (Mobile)</span>
+                    </div>
+                    <a href="customer.html" target="_blank" style="color: #34D399; text-decoration: none; font-size: 11px;">Open Tab ↗</a>
+                </div>
+                <iframe src="customer.html" class="device-iframe" id="frame-customer" title="Customer Ordering App"></iframe>
+            </div>
+
+            <!-- Viewport 2: Staff Kitchen Tablet -->
+            <div class="device-frame-container">
+                <div class="device-frame-header">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="device-dot" style="background: #F59E0B;"></span>
+                        <span>👨‍🍳 Kitchen Staff Terminal</span>
+                    </div>
+                    <a href="staff.html" target="_blank" style="color: #FBBF24; text-decoration: none; font-size: 11px;">Open Tab ↗</a>
+                </div>
+                <iframe src="staff.html" class="device-iframe" id="frame-staff" title="Kitchen & Staff Display"></iframe>
+            </div>
+
+            <!-- Viewport 3: Owner SaaS Dashboard -->
+            <div class="device-frame-container">
+                <div class="device-frame-header">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="device-dot" style="background: #38BDF8;"></span>
+                        <span>👑 Owner SaaS Dashboard</span>
+                    </div>
+                    <a href="admin.html" target="_blank" style="color: #38BDF8; text-decoration: none; font-size: 11px;">Open Tab ↗</a>
+                </div>
+                <iframe src="admin.html" class="device-iframe" id="frame-admin" title="Admin Operations Dashboard"></iframe>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="text-align: center; padding: 30px; color: #64748B; font-size: 13px; border-top: 1px solid rgba(255,255,255,0.06);">
+        <b>First Bite</b> — Built with HTML5, CSS3 & JavaScript • Real-time synchronization via Supabase
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/sound-effects.js"></script>
+    <script src="js/supabase-client.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/portal.js"></script>
+</body>
+</html>

@@ -1,0 +1,810 @@
+/* ==========================================================
+   FIRST BITE — CUSTOMER APP STYLES
+   Mobile-First, Food-Focused, Micro-Animations
+   ========================================================== */
+
+.customer-viewport {
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--bg-white);
+    min-height: 100vh;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+    position: relative;
+    padding-bottom: 90px; /* Space for bottom nav & floating cart */
+}
+
+/* App Header */
+.customer-header {
+    background: linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 100%);
+    padding: 16px 20px 12px 20px;
+    border-bottom: 1px solid var(--border-light);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.greeting-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.restaurant-title {
+    font-size: 19px;
+    font-weight: 800;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-pill {
+    background: #E8F5E9;
+    color: #1B5E20;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.header-cart-btn {
+    position: relative;
+    background: #FFFFFF;
+    border: 1.5px solid var(--border-light);
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.header-cart-btn:hover {
+    background: var(--bg-soft);
+    border-color: var(--primary);
+    transform: scale(1.04);
+}
+
+.header-cart-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: var(--primary);
+    color: #FFFFFF;
+    font-size: 9.5px;
+    font-weight: 800;
+    min-width: 17px;
+    height: 17px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    box-shadow: 0 2px 5px rgba(226, 55, 68, 0.4);
+}
+
+.restaurant-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.rating-badge {
+    background: #087F5B;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+/* Search Bar */
+.search-container {
+    padding: 12px 20px 6px 20px;
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-input-wrapper input {
+    width: 100%;
+    padding: 12px 14px 12px 42px;
+    border-radius: var(--radius-md);
+    background: var(--bg-soft);
+    border: 1px solid var(--border-light);
+    font-size: 14px;
+    transition: all var(--transition-fast);
+}
+
+.search-input-wrapper input:focus {
+    background: #FFFFFF;
+    border-color: var(--primary);
+}
+
+.search-icon {
+    position: absolute;
+    left: 14px;
+    font-size: 16px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.clear-search-btn {
+    position: absolute;
+    right: 12px;
+    background: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    display: none;
+}
+
+/* Dietary Toggle Pills */
+.diet-filter-row {
+    padding: 8px 20px 12px 20px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.diet-filter-row::-webkit-scrollbar {
+    display: none;
+}
+
+.diet-chip {
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-light);
+    background: var(--bg-white);
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.diet-chip.active {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+}
+
+/* Categories Slider */
+.categories-slider {
+    display: flex;
+    gap: 12px;
+    padding: 6px 20px 14px 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.categories-slider::-webkit-scrollbar {
+    display: none;
+}
+
+.category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.category-icon-box {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    transition: all var(--transition-bounce);
+}
+
+.category-card:hover .category-icon-box,
+.category-card.active .category-icon-box {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.category-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+    max-width: 68px;
+    line-height: 1.2;
+}
+
+.category-card.active .category-name {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+/* Section Headers */
+.section-header {
+    padding: 16px 20px 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.section-subtitle {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Food Cards Grid & List */
+.food-list {
+    padding: 6px 20px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.food-card {
+    background: var(--bg-white);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    padding: 14px;
+    display: flex;
+    gap: 14px;
+    position: relative;
+    box-shadow: var(--shadow-xs);
+    transition: all var(--transition-normal);
+    cursor: pointer;
+}
+
+.food-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: #D1D5DB;
+}
+
+.food-card.unavailable {
+    opacity: 0.55;
+    filter: grayscale(0.7);
+    pointer-events: none;
+}
+
+.food-card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.food-tags {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.food-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+    margin-bottom: 4px;
+}
+
+.food-desc {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.food-meta {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+}
+
+.food-price-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.food-price {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+}
+
+.food-card-media {
+    width: 110px;
+    height: 110px;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.food-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.fav-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.fav-btn.active {
+    color: #E11D48;
+}
+
+.add-btn {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #FFFFFF;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    font-weight: 700;
+    font-size: 12px;
+    padding: 6px 18px;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    transition: all var(--transition-bounce);
+}
+
+.add-btn:hover {
+    background: var(--primary);
+    color: #FFFFFF;
+    box-shadow: 0 4px 14px var(--primary-glow);
+}
+
+.customisable-text {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    text-align: center;
+    display: block;
+    margin-top: 12px;
+}
+
+/* Floating Cart Bar */
+.floating-cart-bar {
+    position: fixed;
+    bottom: 64px; /* Sits right above bottom nav */
+    left: 50%;
+    transform: translateX(-50%) translateY(120px);
+    width: calc(100% - 32px);
+    max-width: 440px;
+    background: var(--primary);
+    color: #FFFFFF;
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-floating);
+    z-index: 950;
+    transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+    cursor: pointer;
+}
+
+.floating-cart-bar.visible {
+    transform: translateX(-50%) translateY(0);
+}
+
+.cart-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cart-bar-count-badge {
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.cart-bar-total {
+    font-size: 16px;
+    font-weight: 800;
+    font-family: var(--font-heading);
+}
+
+.cart-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    height: 60px;
+    background: #FFFFFF;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 900;
+}
+
+.nav-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 6px 12px;
+    transition: all var(--transition-fast);
+}
+
+.nav-tab .nav-icon {
+    font-size: 19px;
+    transition: transform var(--transition-bounce);
+}
+
+.nav-tab.active {
+    color: var(--primary);
+}
+
+.nav-tab.active .nav-icon {
+    transform: translateY(-2px);
+}
+
+/* Detail Bottom Sheet */
+.sheet-hero-image {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+}
+
+.sheet-body {
+    padding: 18px 20px;
+    overflow-y: auto;
+}
+
+.sheet-food-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.sheet-food-price {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 12px;
+}
+
+.sheet-food-desc {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+.addons-section {
+    border-top: 1px solid var(--border-light);
+    padding-top: 14px;
+    margin-top: 10px;
+}
+
+.addons-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.addon-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border-subtle);
+    cursor: pointer;
+}
+
+.addon-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.addon-left input[type="checkbox"] {
+    accent-color: var(--primary);
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.addon-price {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sheet-footer {
+    padding: 14px 20px 20px 20px;
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #FFFFFF;
+}
+
+.quantity-stepper {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: var(--bg-soft);
+    overflow: hidden;
+}
+
+.stepper-btn {
+    width: 38px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stepper-btn:hover {
+    background: #E5E7EB;
+}
+
+.stepper-val {
+    width: 32px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.sheet-add-btn {
+    flex: 1;
+    height: 44px;
+    font-size: 15px;
+}
+
+/* Cart Drawer */
+.cart-items-list {
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 0;
+}
+
+.cart-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 10px 14px;
+    background: var(--bg-soft);
+    border-radius: var(--radius-md);
+}
+
+.cart-item-name {
+    font-size: 13.5px;
+    font-weight: 700;
+}
+
+.cart-item-addons {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.bill-breakdown {
+    background: var(--bg-soft);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    margin: 14px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.bill-row {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-secondary);
+}
+
+.bill-row.total {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-primary);
+    border-top: 1px dashed var(--border-light);
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+/* Live Order Tracker Modal */
+.tracker-header {
+    background: var(--primary-light);
+    padding: 20px;
+    text-align: center;
+    border-radius: 20px 20px 0 0;
+}
+
+.order-badge-pill {
+    background: var(--primary);
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 800;
+    padding: 6px 16px;
+    border-radius: var(--radius-full);
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+.tracker-time-estimate {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* Animated Status Stepper */
+.status-stepper {
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    position: relative;
+}
+
+.status-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    position: relative;
+}
+
+.step-node {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #F3F4F6;
+    border: 2px solid #E5E7EB;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    z-index: 2;
+    transition: all var(--transition-bounce);
+}
+
+.status-step.completed .step-node {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #FFFFFF;
+}
+
+.status-step.active .step-node {
+    background: #FFFFFF;
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-light);
+    animation: pulseNode 1.5s infinite;
+}
+
+@keyframes pulseNode {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
+.step-connector {
+    position: absolute;
+    top: 36px;
+    left: 17px;
+    width: 2px;
+    height: calc(100% + 4px);
+    background: #E5E7EB;
+    z-index: 1;
+}
+
+.status-step.completed .step-connector {
+    background: var(--primary);
+}
+
+.step-info {
+    flex: 1;
+}
+
+.step-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.step-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
