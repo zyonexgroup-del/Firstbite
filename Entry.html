@@ -6,6 +6,10 @@
     <title>First Bite — Restaurant Ordering & Management Platform</title>
     <meta name="description" content="One platform. Three experiences. Real-time restaurant operations with Customer App, Staff App, and Admin App powered by Supabase.">
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.svg">
+
     <link rel="stylesheet" href="css/common.css">
     <link rel="stylesheet" href="css/portal.css">
 </head>
@@ -208,7 +212,8 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-sdk.min.js"></script>
+    <script>if(!window.supabase){document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>')}</script>
     <script src="js/sound-effects.js"></script>
     <script src="js/supabase-client.js"></script>
     <script src="js/common.js"></script>

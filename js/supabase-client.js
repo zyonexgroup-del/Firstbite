@@ -340,11 +340,20 @@ class FirstBiteStore {
         }
 
         try {
+            // No-op storage: prevents Edge/Safari Tracking Prevention from blocking
+            // the Supabase library's own auth localStorage access when running from file://
+            const _noopStorage = {
+                getItem:    (_key) => null,
+                setItem:    (_key, _value) => {},
+                removeItem: (_key) => {}
+            };
+
             this.supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey, {
                 auth: {
                     persistSession: false,
                     autoRefreshToken: false,
-                    detectSessionInUrl: false
+                    detectSessionInUrl: false,
+                    storage: _noopStorage
                 },
                 realtime: {
                     params: {
@@ -386,8 +395,13 @@ class FirstBiteStore {
                 .on('broadcast', { event: 'SETTINGS_UPDATED' }, (payload) => {
                     this._handleRemoteEvent(payload.payload);
                 })
-                // 2. Database change listeners (Postgres CDC)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+                // 2. Database change listeners (Postgres CDC) — fires on ALL devices
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, async (payload) => {
+                    // New order inserted — sync immediately
+                    await this.syncOrdersFromSupabase();
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, async (payload) => {
+                    // Order status changed — sync immediately
                     await this.syncOrdersFromSupabase();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, async () => {
@@ -402,9 +416,11 @@ class FirstBiteStore {
                 .subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
                         this.isRealtimeConnected = true;
+                        console.info('✅ First Bite Realtime: SUBSCRIBED');
                         this._notify('REALTIME_CONNECTED', { status: 'connected' });
                     } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                         this.isRealtimeConnected = false;
+                        console.warn('⚠️ First Bite Realtime channel status:', status);
                     }
                 });
 
@@ -415,6 +431,14 @@ class FirstBiteStore {
             setInterval(() => {
                 this.lastPing = Math.floor(14 + Math.random() * 8);
             }, 10000);
+
+            // Periodic fallback sync every 30 seconds — catches missed Realtime events
+            // (handles WebSocket drops, brief disconnects, or slow channel subscription)
+            setInterval(async () => {
+                try {
+                    await this.syncOrdersFromSupabase();
+                } catch (e) { /* silent */ }
+            }, 30000);
         } catch (e) {
             console.warn('Supabase Realtime WebSocket initialization notice:', e);
         }
@@ -525,11 +549,76 @@ class FirstBiteStore {
                 .select('*')
                 .order('name');
 
-            if (!menuErr && Array.isArray(menuData) && menuData.length > 0) {
-                localStorage.setItem('fb_menu', JSON.stringify(menuData));
-                this._notify('MENU_UPDATED', { menu: menuData });
+            if (!menuErr && Array.isArray(menuData)) {
+                if (menuData.length === 0) {
+                    // Supabase menu_items is empty in the database. Seed default catalog into Supabase.
+                    await this.seedMenuToSupabase();
+                } else {
+                    // Smart merge: retain default/local menu items and overlay cloud items
+                    // This guarantees adding 1 item never deletes or clears existing items!
+                    const localMenu = this.getMenuItems();
+                    const map = new Map();
+
+                    // Seed with local items first
+                    localMenu.forEach(item => {
+                        const key = (item.name || '').trim().toLowerCase();
+                        if (key) map.set(key, item);
+                    });
+
+                    // Overlay Supabase cloud items (they have verified cloud UUIDs)
+                    menuData.forEach(item => {
+                        const key = (item.name || '').trim().toLowerCase();
+                        if (key) {
+                            const existing = map.get(key) || {};
+                            map.set(key, { ...existing, ...item, id: item.id });
+                        } else if (item.id) {
+                            map.set(item.id, item);
+                        }
+                    });
+
+                    const merged = Array.from(map.values());
+                    localStorage.setItem('fb_menu', JSON.stringify(merged));
+                    this._notify('MENU_UPDATED', { menu: merged });
+                }
             }
-        } catch (e) {}
+        } catch (e) {
+            console.warn('Sync menu warning:', e);
+        }
+    }
+
+    async seedMenuToSupabase() {
+        if (!this.supabase) return;
+        try {
+            const items = this.getMenuItems();
+            if (!items || items.length === 0) return;
+
+            const toInsert = items.map(item => ({
+                name: item.name,
+                price: Number(item.price) || 0,
+                description: item.description || '',
+                image_url: item.image_url || '',
+                is_veg: item.is_veg !== false,
+                is_available: item.is_available !== false,
+                rating: Number(item.rating) || 4.8,
+                prep_time: item.prep_time || '15 min',
+                calories: item.calories || '',
+                badge: item.badge || null,
+                add_ons: Array.isArray(item.add_ons) ? item.add_ons : []
+            }));
+
+            const { data, error } = await this.supabase
+                .from('menu_items')
+                .insert(toInsert)
+                .select();
+
+            if (!error && Array.isArray(data)) {
+                console.info(`✅ Seeded ${data.length} dishes to Supabase cloud!`);
+                localStorage.setItem('fb_menu', JSON.stringify(data));
+                this._notify('MENU_UPDATED', { menu: data });
+            }
+        } catch (err) {
+            console.warn('Seed menu error:', err);
+        }
     }
 
     async syncSettingsFromSupabase() {
@@ -795,32 +884,69 @@ class FirstBiteStore {
 
     getMenuItems() {
         try {
-            return JSON.parse(localStorage.getItem('fb_menu')) || DEFAULT_MENU_ITEMS;
+            const raw = localStorage.getItem('fb_menu');
+            let menu = raw ? JSON.parse(raw) : DEFAULT_MENU_ITEMS;
+            if (!Array.isArray(menu) || menu.length === 0) {
+                menu = DEFAULT_MENU_ITEMS;
+            }
+
+            // Sanitize: ensure every dish has a valid unique ID and boolean is_available
+            let updated = false;
+            menu = menu.map((m, idx) => {
+                if (!m.id || m.id === 'null' || m.id === 'undefined') {
+                    m.id = `dish-${Date.now()}-${idx}-${Math.floor(Math.random()*1000)}`;
+                    updated = true;
+                }
+                if (m.is_available === undefined) {
+                    m.is_available = true;
+                }
+                return m;
+            });
+
+            if (updated) {
+                localStorage.setItem('fb_menu', JSON.stringify(menu));
+            }
+            return menu;
         } catch {
             return DEFAULT_MENU_ITEMS;
         }
     }
 
     getMenuItemById(id) {
+        if (!id) return null;
         const menu = this.getMenuItems();
-        return menu.find(m => m.id === id) || null;
+        return menu.find(m => m.id === id || m.name.toLowerCase() === String(id).toLowerCase()) || null;
     }
 
     saveMenuItem(item) {
         const menu = this.getMenuItems();
-        const index = menu.findIndex(m => m.id === item.id);
+        const effectiveId = (item.id && item.id !== 'null' && item.id !== 'undefined') ? item.id : null;
+
+        let index = -1;
+        if (effectiveId) {
+            index = menu.findIndex(m => m.id === effectiveId);
+        } else if (item.name) {
+            index = menu.findIndex(m => m.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+        }
+
+        const finalId = effectiveId || (index >= 0 ? menu[index].id : `dish-${Date.now()}-${Math.floor(Math.random()*1000)}`);
+
+        const resolvedItem = {
+            rating: 4.8,
+            prep_time: '15 min',
+            calories: '',
+            badge: null,
+            add_ons: [],
+            ...item,
+            id: finalId,
+            is_available: item.is_available !== false,
+            updated_at: new Date().toISOString()
+        };
 
         if (index >= 0) {
-            menu[index] = { ...menu[index], ...item, updated_at: new Date().toISOString() };
+            menu[index] = { ...menu[index], ...resolvedItem };
         } else {
-            const newItem = {
-                id: item.id || `dish-${Date.now()}`,
-                rating: 4.8,
-                is_available: true,
-                created_at: new Date().toISOString(),
-                ...item
-            };
-            menu.unshift(newItem);
+            menu.unshift(resolvedItem);
         }
 
         localStorage.setItem('fb_menu', JSON.stringify(menu));
@@ -833,57 +959,106 @@ class FirstBiteStore {
         if (this.supabase) {
             (async () => {
                 try {
-                    const isUuid = item.id && item.id.length === 36 && item.id.includes('-');
-                    await this.supabase.from('menu_items').upsert({
-                        id: isUuid ? item.id : undefined,
-                        name: item.name,
-                        price: Number(item.price),
-                        description: item.description || '',
-                        image_url: item.image_url || '',
-                        is_veg: item.is_veg !== false,
-                        is_available: item.is_available !== false,
-                        badge: item.badge || null,
-                        add_ons: item.add_ons || [],
-                        updated_at: new Date().toISOString()
-                    });
-                } catch (e) {}
+                    const isUuid = typeof resolvedItem.id === 'string' && resolvedItem.id.length === 36 && resolvedItem.id.includes('-');
+
+                    const dbPayload = {
+                        name: resolvedItem.name,
+                        price: Number(resolvedItem.price) || 0,
+                        description: resolvedItem.description || '',
+                        image_url: resolvedItem.image_url || '',
+                        is_veg: resolvedItem.is_veg !== false,
+                        is_available: resolvedItem.is_available !== false,
+                        badge: resolvedItem.badge || null,
+                        add_ons: Array.isArray(resolvedItem.add_ons) ? resolvedItem.add_ons : []
+                    };
+                    if (isUuid) dbPayload.id = resolvedItem.id;
+
+                    const { data: savedRecord, error: saveErr } = await this.supabase
+                        .from('menu_items')
+                        .upsert(dbPayload)
+                        .select()
+                        .single();
+
+                    if (!saveErr && savedRecord && savedRecord.id) {
+                        const currentMenu = this.getMenuItems();
+                        const idx = currentMenu.findIndex(m => m.id === resolvedItem.id || m.name === resolvedItem.name);
+                        if (idx !== -1) {
+                            currentMenu[idx].id = savedRecord.id;
+                            localStorage.setItem('fb_menu', JSON.stringify(currentMenu));
+                        }
+                        console.info(`✅ Dish "${resolvedItem.name}" saved to Supabase cloud! UUID: ${savedRecord.id}`);
+                    } else if (saveErr) {
+                        console.error('❌ Supabase menu save error:', saveErr.message);
+                    }
+                } catch (e) {
+                    console.error('❌ Supabase menu save exception:', e);
+                }
             })();
         }
 
-        return item;
+        return resolvedItem;
     }
 
     toggleItemAvailability(itemId, isAvailable) {
         const menu = this.getMenuItems();
-        const item = menu.find(m => m.id === itemId);
-        if (item) {
-            item.is_available = isAvailable;
-            item.updated_at = new Date().toISOString();
-            localStorage.setItem('fb_menu', JSON.stringify(menu));
-
-            this._broadcast({
-                type: 'MENU_UPDATED',
-                itemId,
-                isAvailable,
-                menu
-            });
-
-            // Update Supabase in background
-            if (this.supabase) {
-                (async () => {
-                    try {
-                        let isUuid = typeof itemId === 'string' && itemId.length === 36 && itemId.includes('-');
-                        let q = this.supabase.from('menu_items').update({ is_available: isAvailable, updated_at: new Date().toISOString() });
-                        if (isUuid) q = q.eq('id', itemId);
-                        else q = q.eq('name', item.name);
-                        await q;
-                    } catch (e) {}
-                })();
-            }
-
-            return item;
+        const item = menu.find(m => m.id === itemId || (typeof itemId === 'string' && m.name.toLowerCase() === itemId.toLowerCase()));
+        if (!item) {
+            console.warn('⚠️ Item not found to toggle availability:', itemId);
+            return null;
         }
-        return null;
+
+        item.is_available = Boolean(isAvailable);
+        item.updated_at = new Date().toISOString();
+        localStorage.setItem('fb_menu', JSON.stringify(menu));
+
+        this._broadcast({
+            type: 'MENU_UPDATED',
+            itemId: item.id,
+            name: item.name,
+            isAvailable: item.is_available,
+            menu
+        });
+
+        // Update Supabase in background
+        if (this.supabase) {
+            (async () => {
+                try {
+                    const isUuid = typeof item.id === 'string' && item.id.length === 36 && item.id.includes('-');
+
+                    // Only send is_available so it never fails on missing updated_at column
+                    let q = this.supabase
+                        .from('menu_items')
+                        .update({ is_available: Boolean(isAvailable) });
+
+                    if (isUuid) {
+                        q = q.eq('id', item.id);
+                    } else {
+                        q = q.eq('name', item.name);
+                    }
+
+                    let { error } = await q;
+
+                    // If error or if item was not found by UUID, fallback to updating by dish name
+                    if (error || isUuid) {
+                        const r2 = await this.supabase
+                            .from('menu_items')
+                            .update({ is_available: Boolean(isAvailable) })
+                            .eq('name', item.name);
+                        if (!r2.error) error = null;
+                    }
+
+                    if (error) {
+                        console.error('❌ Supabase menu stock toggle error:', error.message);
+                    } else {
+                        console.info(`✅ Supabase: "${item.name}" stock is now ${isAvailable ? 'IN STOCK' : 'OUT OF STOCK'}`);
+                    }
+                } catch (e) {
+                    console.error('❌ Supabase menu stock update exception:', e);
+                }
+            })();
+        }
+
+        return item;
     }
 
     deleteMenuItem(itemId) {
@@ -1100,58 +1275,118 @@ class FirstBiteStore {
             (async () => {
                 try {
                     const dbOrder = {
-                        order_number: newOrder.order_number,
-                        customer_name: newOrder.customer_name || 'Guest',
+                        order_number:   newOrder.order_number,
+                        customer_name:  newOrder.customer_name || 'Guest',
                         customer_phone: newOrder.customer_phone || null,
-                        order_type: newOrder.order_type || 'dine_in',
-                        table_number: newOrder.table_number || null,
-                        status: newOrder.status || 'new',
+                        order_type:     newOrder.order_type || 'dine_in',
+                        table_number:   newOrder.table_number || null,
+                        status:         newOrder.status || 'new',
                         payment_method: newOrder.payment_method || 'cash',
                         payment_status: newOrder.payment_status || 'pending',
-                        subtotal: Number(newOrder.subtotal) || 0,
-                        tax: Number(newOrder.tax) || 0,
-                        discount: Number(newOrder.discount) || 0,
-                        total: Number(newOrder.total) || 0,
-                        instructions: newOrder.instructions || null
+                        coupon_code:    newOrder.coupon_code || null,
+                        subtotal:       Number(newOrder.subtotal) || 0,
+                        tax:            Number(newOrder.tax) || 0,
+                        discount:       Number(newOrder.discount) || 0,
+                        total:          Number(newOrder.total) || 0,
+                        instructions:   newOrder.instructions || null,
+                        order_date:     newOrder.order_date || new Date().toISOString().slice(0, 10)
                     };
 
-                    const { data: insertedOrder, error: orderErr } = await this.supabase
+                    let { data: insertedOrder, error: orderErr } = await this.supabase
                         .from('orders')
                         .insert([dbOrder])
                         .select()
                         .single();
 
+                    // Resilient fallback: if optional columns don't exist yet (schema not re-run),
+                    // retry with only the core columns guaranteed to exist in every deployment.
+                    if (orderErr) {
+                        const isColumnError = orderErr.code === '42703' ||
+                            (orderErr.message && orderErr.message.toLowerCase().includes('column')) ||
+                            (orderErr.message && orderErr.message.toLowerCase().includes('does not exist'));
+
+                        if (isColumnError) {
+                            console.warn('⚠️ Column mismatch. Retrying insert with core columns only. Run schema.sql to fix permanently.');
+                            const coreOrder = {
+                                order_number:   dbOrder.order_number,
+                                customer_name:  dbOrder.customer_name,
+                                customer_phone: dbOrder.customer_phone,
+                                order_type:     dbOrder.order_type,
+                                table_number:   dbOrder.table_number,
+                                status:         dbOrder.status,
+                                payment_method: dbOrder.payment_method,
+                                payment_status: dbOrder.payment_status,
+                                subtotal:       dbOrder.subtotal,
+                                tax:            dbOrder.tax,
+                                discount:       dbOrder.discount,
+                                total:          dbOrder.total,
+                                instructions:   dbOrder.instructions
+                            };
+                            const r2 = await this.supabase.from('orders').insert([coreOrder]).select().single();
+                            insertedOrder = r2.data;
+                            orderErr = r2.error;
+                        }
+                    }
+
+                    if (orderErr) {
+                        console.error('❌ Supabase order insert error — Message:', orderErr.message,
+                            '| Code:', orderErr.code,
+                            '| Details:', orderErr.details,
+                            '| Hint:', orderErr.hint);
+                        console.warn('ℹ️ To fix: run the updated schema.sql at https://supabase.com/dashboard/project/otohichqlyanmddwgofm/sql');
+                    }
+
                     if (!orderErr && insertedOrder) {
-                        newOrder.id = insertedOrder.id;
+                        const supabaseId = insertedOrder.id;
+                        newOrder.id = supabaseId;
 
                         if (newOrder.items && newOrder.items.length > 0) {
                             const dbItems = newOrder.items.map(it => ({
-                                order_id: insertedOrder.id,
-                                name: it.name,
-                                price: Number(it.price) || 0,
-                                quantity: Number(it.quantity) || 1,
+                                order_id:         supabaseId,
+                                name:             it.name,
+                                price:            Number(it.price) || 0,
+                                quantity:         Number(it.quantity) || 1,
                                 selected_add_ons: it.selected_add_ons || [],
-                                item_total: Number(it.item_total) || ((Number(it.price) || 0) * (Number(it.quantity) || 1))
+                                item_total:       Number(it.item_total) || ((Number(it.price) || 0) * (Number(it.quantity) || 1))
                             }));
-                            await this.supabase.from('order_items').insert(dbItems);
+                            const { error: itemsErr } = await this.supabase.from('order_items').insert(dbItems);
+                            if (itemsErr) console.error('❌ Supabase order_items insert error:', itemsErr.message);
                         }
 
-                        // Update local record with verified Supabase UUID
+                        // CRITICAL: Update local records and active tracking ID to Supabase UUID
                         const currentOrders = this.getOrders();
                         const idx = currentOrders.findIndex(o => o.order_number === newOrder.order_number);
                         if (idx !== -1) {
-                            currentOrders[idx].id = insertedOrder.id;
+                            currentOrders[idx].id = supabaseId;
                             localStorage.setItem('fb_orders', JSON.stringify(currentOrders));
                         }
 
-                        // Broadcast verified cloud record
+                        // Update the active order tracker to use the real Supabase UUID
+                        localStorage.setItem('fb_active_order_id', supabaseId);
+                        localStorage.setItem('fb_active_order_number', newOrder.order_number);
+
+                        // Also update customer history with real UUID
+                        try {
+                            const customerHistory = JSON.parse(localStorage.getItem('fb_customer_history')) || [];
+                            const oldTempIdx = customerHistory.indexOf(newOrder.id);
+                            if (oldTempIdx !== -1) {
+                                customerHistory[oldTempIdx] = supabaseId;
+                            } else if (!customerHistory.includes(supabaseId)) {
+                                customerHistory.unshift(supabaseId);
+                            }
+                            localStorage.setItem('fb_customer_history', JSON.stringify(customerHistory));
+                        } catch (e) {}
+
+                        // Broadcast verified cloud record with real UUID
                         this._broadcast({
                             type: 'ORDER_CREATED',
-                            order: newOrder
+                            order: { ...newOrder, id: supabaseId }
                         });
+
+                        console.info('✅ Order saved to Supabase:', supabaseId);
                     }
                 } catch (err) {
-                    console.warn('Supabase order insert background notice:', err);
+                    console.error('❌ Supabase order insert failed:', err);
                 }
             })();
         }
@@ -1190,21 +1425,35 @@ class FirstBiteStore {
             if (this.supabase) {
                 (async () => {
                     try {
-                        const payload = {
-                            status: newStatus,
-                            updated_at: new Date().toISOString()
-                        };
+                        // Prefer UUID match; fallback to order_number for pre-Supabase orders
+                        const isUuid = typeof order.id === 'string' && order.id.length === 36 && order.id.includes('-') && !order.id.startsWith('order-fb-');
+                        const eqCol = isUuid ? 'id' : 'order_number';
+                        const eqVal = isUuid ? order.id : order.order_number;
 
-                        let isUuid = typeof order.id === 'string' && order.id.length === 36 && order.id.includes('-');
-                        let q = this.supabase.from('orders').update(payload);
-                        if (isUuid) {
-                            q = q.eq('id', order.id);
-                        } else {
-                            q = q.eq('order_number', order.order_number);
+                        // Build full payload (includes optional cancellation columns)
+                        const payload = { status: newStatus };
+
+                        if (newStatus === 'cancelled') {
+                            payload.cancellation_reason = reason || 'Order cancelled by restaurant.';
+                            payload.cancelled_at = new Date().toISOString();
                         }
-                        await q;
+
+                        let { error } = await this.supabase
+                            .from('orders').update(payload).eq(eqCol, eqVal);
+
+                        // Resilient fallback: if cancellation columns don't exist yet, retry with status only
+                        if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('column')))) {
+                            console.warn('⚠️ Cancellation columns missing in DB. Updating status only. Run schema.sql to fix.');
+                            const fallback = { status: newStatus };
+                            const r2 = await this.supabase
+                                .from('orders').update(fallback).eq(eqCol, eqVal);
+                            error = r2.error;
+                        }
+
+                        if (error) console.error('❌ Supabase order status update error:', error.message);
+                        else console.info(`✅ Order ${order.order_number} status → ${newStatus}`);
                     } catch (err) {
-                        console.warn('Supabase order update status notice:', err);
+                        console.error('❌ Supabase order update failed:', err);
                     }
                 })();
             }
@@ -1233,15 +1482,18 @@ class FirstBiteStore {
             if (this.supabase) {
                 (async () => {
                     try {
-                        let isUuid = typeof order.id === 'string' && order.id.length === 36 && order.id.includes('-');
-                        let q = this.supabase.from('orders').update({
-                            payment_status: newPaymentStatus,
-                            updated_at: new Date().toISOString()
-                        });
-                        if (isUuid) q = q.eq('id', order.id);
-                        else q = q.eq('order_number', order.order_number);
-                        await q;
-                    } catch (e) {}
+                        const isUuid = typeof order.id === 'string' && order.id.length === 36 && order.id.includes('-') && !order.id.startsWith('order-fb-');
+                        const eqCol = isUuid ? 'id' : 'order_number';
+                        const eqVal = isUuid ? order.id : order.order_number;
+
+                        let { error } = await this.supabase
+                            .from('orders').update({ payment_status: newPaymentStatus }).eq(eqCol, eqVal);
+
+                        if (error) console.error('❌ Payment status update error:', error.message);
+                        else console.info(`✅ Order ${order.order_number} payment → ${newPaymentStatus}`);
+                    } catch (e) {
+                        console.error('❌ Payment status update failed:', e);
+                    }
                 })();
             }
 

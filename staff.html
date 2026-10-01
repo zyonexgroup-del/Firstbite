@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>First Bite — Kitchen & Staff Terminal</title>
-    <meta name="description" content="High-speed mobile kitchen display system and staff order processing terminal for First Bite.">
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.svg">
+
     <link rel="stylesheet" href="css/common.css">
     <link rel="stylesheet" href="css/staff.css">
 </head>
@@ -214,7 +217,8 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-sdk.min.js"></script>
+    <script>if(!window.supabase){document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>')}</script>
     <script src="js/sound-effects.js"></script>
     <script src="js/supabase-client.js"></script>
     <script src="js/common.js"></script>

@@ -34,6 +34,14 @@ class StaffApp {
             });
         }, 15000);
 
+        // Periodic Supabase sync every 15 seconds as a Realtime WebSocket fallback
+        // Ensures orders appear even when the channel subscription is delayed
+        setInterval(async () => {
+            if (this.store && this.store.syncOrdersFromSupabase) {
+                await this.store.syncOrdersFromSupabase();
+            }
+        }, 15000);
+
         // Handle resize (mobile ↔ desktop toggle)
         window.addEventListener('resize', () => {
             const wasMobile = this.isMobile;
@@ -454,7 +462,7 @@ class StaffApp {
                     </div>
                 </div>
                 <label class="stock-toggle-switch">
-                    <input type="checkbox" ${item.is_available ? 'checked' : ''} data-item-toggle="${item.id}">
+                    <input type="checkbox" ${item.is_available !== false ? 'checked' : ''} data-item-toggle="${item.id}">
                     <span class="slider-round"></span>
                 </label>
             </div>
@@ -594,10 +602,27 @@ class StaffApp {
         this.store.subscribe('ORDER_STATUS_CHANGED', () => this.renderAll());
         this.store.subscribe('ORDER_PAID',           () => this.renderAll());
         this.store.subscribe('DATA_REFRESH',         () => this.renderAll());
+        this.store.subscribe('REALTIME_CONNECTED',   () => {
+            // When Realtime connects, do an immediate full sync to catch any orders
+            // placed while the channel was subscribing
+            if (this.store && this.store.syncOrdersFromSupabase) {
+                this.store.syncOrdersFromSupabase().then(() => this.renderAll());
+            }
+        });
         this.store.subscribe('SETTINGS_UPDATED',     () => this.updateKitchenStatusUI());
-        this.store.subscribe('MENU_UPDATED',         () => {
+        this.store.subscribe('MENU_UPDATED', (event) => {
             const modal = document.getElementById('menu-stock-modal');
-            if (modal?.classList.contains('active')) this.openStockModal();
+            if (modal?.classList.contains('active')) {
+                // Smooth in-place checkbox sync: don't destroy DOM under the user's fingers
+                if (event && event.itemId !== undefined && event.isAvailable !== undefined) {
+                    const input = modal.querySelector(`input[data-item-toggle="${event.itemId}"]`);
+                    if (input) {
+                        input.checked = Boolean(event.isAvailable);
+                        return;
+                    }
+                }
+                this.openStockModal();
+            }
         });
     }
 }

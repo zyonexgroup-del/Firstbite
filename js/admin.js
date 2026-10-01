@@ -41,6 +41,21 @@ class AdminApp {
         this.renderSettingsForm();
         this.setupEventListeners();
         this.setupRealtimeListeners();
+
+        // Sync fresh data from Supabase on load
+        if (this.store && this.store.syncAllFromSupabase) {
+            this.store.syncAllFromSupabase().then(() => {
+                this.renderDashboard();
+                this.renderOrdersTable();
+                this.renderMenuTable();
+                this.renderRestaurantInfo();
+            }).catch(e => console.warn('Admin Supabase sync on init:', e));
+
+            // Continuous 10s auto-refresh so Admin stats & orders stay live across devices
+            setInterval(() => {
+                this.store.syncAllFromSupabase().catch(() => {});
+            }, 10000);
+        }
     }
 
     renderRestaurantInfo() {
@@ -71,47 +86,58 @@ class AdminApp {
     // ═══════════════════════════════════════════════════════════
 
     _getDateRange() {
-        const now   = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const now = new Date();
 
         switch (this.analyticsRange) {
-            case 'today':
-                return { from: today, to: new Date(today.getTime() + 86400000 - 1) };
+            case 'today': {
+                const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+                const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+                return { from: start, to: end };
+            }
             case 'yesterday': {
-                const y = new Date(today.getTime() - 86400000);
-                return { from: y, to: new Date(y.getTime() + 86400000 - 1) };
+                const yDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+                const start = new Date(yDate.getFullYear(), yDate.getMonth(), yDate.getDate(), 0, 0, 0, 0);
+                const end   = new Date(yDate.getFullYear(), yDate.getMonth(), yDate.getDate(), 23, 59, 59, 999);
+                return { from: start, to: end };
             }
             case 'week': {
-                const dow   = today.getDay();
-                const start = new Date(today.getTime() - dow * 86400000);
-                return { from: start, to: new Date(start.getTime() + 7 * 86400000 - 1) };
+                const dow   = now.getDay();
+                const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow, 0, 0, 0, 0);
+                const end   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+                return { from: start, to: end };
             }
             case 'month': {
-                const start = new Date(now.getFullYear(), now.getMonth(), 1);
-                const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+                const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
                 return { from: start, to: end };
             }
             case 'last_month': {
-                const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                const end   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+                const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+                const end   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
                 return { from: start, to: end };
             }
             case 'custom': {
-                const from = this.customDateFrom ? new Date(this.customDateFrom) : new Date(0);
-                const to   = this.customDateTo   ? new Date(this.customDateTo + 'T23:59:59') : new Date();
+                const from = this.customDateFrom ? new Date(this.customDateFrom + 'T00:00:00') : new Date(0);
+                const to   = this.customDateTo   ? new Date(this.customDateTo + 'T23:59:59.999') : new Date();
                 return { from, to };
             }
             case 'all':
             default:
-                return { from: new Date(0), to: new Date() };
+                return { from: new Date(0), to: new Date(8640000000000000) };
         }
     }
 
     _filterOrdersByRange(orders) {
         const { from, to } = this._getDateRange();
         return orders.filter(o => {
-            const d = new Date(o.created_at);
-            return d >= from && d <= to;
+            let orderDate = null;
+            if (o.created_at) {
+                orderDate = new Date(o.created_at);
+            } else if (o.order_date) {
+                orderDate = new Date(o.order_date + 'T12:00:00');
+            }
+            if (!orderDate || isNaN(orderDate.getTime())) return false;
+            return orderDate >= from && orderDate <= to;
         });
     }
 
@@ -123,7 +149,7 @@ class AdminApp {
 
         let totalSales = 0, completedCount = 0, pendingCount = 0;
         orders.forEach(o => {
-            if (o.status !== 'cancelled') totalSales += o.total;
+            if (o.status !== 'cancelled') totalSales += (Number(o.total) || 0);
             if (o.status === 'served')    completedCount++;
             if (['new','accepted','preparing','ready'].includes(o.status)) pendingCount++;
         });
@@ -152,22 +178,24 @@ class AdminApp {
 
         ctx.clearRect(0, 0, width, height);
 
-        // Build last 7 days labels & totals from real order data
+        // Build last 7 days labels & real totals from actual order records
         const days   = [];
         const values = [];
         for (let i = 6; i >= 0; i--) {
             const d = new Date();
             d.setDate(d.getDate() - i);
             const label = i === 0 ? 'Today' : d.toLocaleDateString('en-IN', { weekday: 'short' });
-            const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-            const end   = new Date(start.getTime() + 86400000 - 1);
+            const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+            const end   = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
             const dayTotal = orders
-                .filter(o => o.status !== 'cancelled' && new Date(o.created_at) >= start && new Date(o.created_at) <= end)
-                .reduce((s, o) => s + o.total, 0);
-            // Add a minimum demo base so the chart isn't all zeros on first load
-            const demoBase = [12400, 18500, 14200, 22100, 28900, 34200, 0][6 - i] || 0;
+                .filter(o => {
+                    if (o.status === 'cancelled') return false;
+                    const od = o.created_at ? new Date(o.created_at) : (o.order_date ? new Date(o.order_date + 'T12:00:00') : null);
+                    return od && !isNaN(od.getTime()) && od >= start && od <= end;
+                })
+                .reduce((s, o) => s + (Number(o.total) || 0), 0);
             days.push(label);
-            values.push(dayTotal > 0 ? dayTotal : demoBase);
+            values.push(dayTotal);
         }
 
         const padding    = 40;
@@ -923,18 +951,49 @@ class AdminApp {
     }
 
     setupRealtimeListeners() {
-        this.store.subscribe('ORDER_CREATED', () => {
+        this.store.subscribe('ORDER_CREATED', (event) => {
             this.renderDashboard();
             this.renderOrdersTable();
-            showToast('Admin: New order received!', 'info');
+            if (event && event.order) {
+                showToast(`🔔 New Order placed: ${event.order.order_number}`, 'warning');
+            }
         });
+
         this.store.subscribe('ORDER_STATUS_CHANGED', () => {
             this.renderDashboard();
             this.renderOrdersTable();
         });
-        this.store.subscribe('ORDER_PAID',       () => { this.renderDashboard(); this.renderOrdersTable(); });
-        this.store.subscribe('MENU_UPDATED',     () => this.renderMenuTable());
-        this.store.subscribe('SETTINGS_UPDATED', () => this.renderRestaurantInfo());
+
+        this.store.subscribe('ORDER_PAID', () => {
+            this.renderDashboard();
+            this.renderOrdersTable();
+        });
+
+        this.store.subscribe('DATA_REFRESH', () => {
+            this.renderDashboard();
+            this.renderOrdersTable();
+        });
+
+        this.store.subscribe('REALTIME_CONNECTED', () => {
+            if (this.store && this.store.syncAllFromSupabase) {
+                this.store.syncAllFromSupabase().then(() => {
+                    this.renderDashboard();
+                    this.renderOrdersTable();
+                });
+            }
+        });
+
+        this.store.subscribe('MENU_UPDATED', () => {
+            this.renderMenuTable();
+        });
+
+        this.store.subscribe('SETTINGS_UPDATED', () => {
+            this.renderRestaurantInfo();
+        });
+
+        this.store.subscribe('COUPONS_UPDATED', () => {
+            this.renderCouponsList();
+        });
     }
 }
 
@@ -1058,43 +1117,6 @@ AdminApp.prototype.deleteCoupon = function(couponId) {
     if (this.store.deleteCoupon) this.store.deleteCoupon(couponId);
     this.renderCouponsList();
     showToast('Coupon deleted', 'info');
-};
-
-AdminApp.prototype.setupRealtimeListeners = function() {
-    this.store.subscribe('ORDER_CREATED', (event) => {
-        this.renderDashboard();
-        this.renderOrdersTable();
-        if (event && event.order) {
-            showToast(`🔔 New Order placed: ${event.order.order_number}`, 'warning');
-        }
-    });
-
-    this.store.subscribe('ORDER_STATUS_CHANGED', () => {
-        this.renderDashboard();
-        this.renderOrdersTable();
-    });
-
-    this.store.subscribe('ORDER_PAID', () => {
-        this.renderDashboard();
-        this.renderOrdersTable();
-    });
-
-    this.store.subscribe('DATA_REFRESH', () => {
-        this.renderDashboard();
-        this.renderOrdersTable();
-    });
-
-    this.store.subscribe('SETTINGS_UPDATED', () => {
-        this.renderRestaurantInfo();
-    });
-
-    this.store.subscribe('MENU_UPDATED', () => {
-        this.renderMenuTable();
-    });
-
-    this.store.subscribe('COUPONS_UPDATED', () => {
-        this.renderCouponsList();
-    });
 };
 
 window.adminApp = new AdminApp();

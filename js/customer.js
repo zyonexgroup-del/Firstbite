@@ -57,11 +57,35 @@ class CustomerApp {
         }
 
         // Check if there is an active order being tracked
-        const activeOrderId = localStorage.getItem('fb_active_order_id');
-        if (activeOrderId) {
-            const order = this.store.getOrderById(activeOrderId);
-            if (order && order.status !== 'served') {
+        const activeOrderId  = localStorage.getItem('fb_active_order_id');
+        const activeOrderNum = localStorage.getItem('fb_active_order_number');
+        if (activeOrderId || activeOrderNum) {
+            // Immediately show from localStorage if available
+            let order = activeOrderId ? this.store.getOrderById(activeOrderId) : null;
+            if (!order && activeOrderNum) {
+                order = this.store.getOrders().find(o => o.order_number === activeOrderNum) || null;
+            }
+            if (order && order.status !== 'served' && order.status !== 'cancelled') {
                 this.showActiveOrderBanner(order);
+            }
+
+            // Then re-fetch from Supabase in background to get the truly latest status
+            if (this.store.syncOrdersFromSupabase) {
+                this.store.syncOrdersFromSupabase().then(() => {
+                    let fresh = activeOrderId ? this.store.getOrderById(activeOrderId) : null;
+                    if (!fresh && activeOrderNum) {
+                        fresh = this.store.getOrders().find(o => o.order_number === activeOrderNum) || null;
+                    }
+                    if (fresh) {
+                        if (fresh.status !== 'served') {
+                            this.showActiveOrderBanner(fresh);
+                        }
+                        const modal = document.getElementById('order-tracker-modal');
+                        if (modal && modal.classList.contains('active')) {
+                            this._updateTrackerStatusUI(fresh);
+                        }
+                    }
+                }).catch(() => {});
             }
         }
     }
@@ -387,12 +411,26 @@ class CustomerApp {
     _updateSheetTotalButton() {
         if (!this.currentSelectedItem) return;
         const currency = this.store.getRestaurant().currency || '₹';
+        const btn = document.getElementById('sheet-submit-add-btn');
+        if (!btn) return;
+
+        if (this.currentSelectedItem.is_available === false) {
+            btn.disabled = true;
+            btn.innerHTML = `OUT OF STOCK`;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+            return;
+        }
+
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+
         let addonsTotal = 0;
         this.selectedAddons.forEach(a => addonsTotal += a.price);
         const singleTotal = this.currentSelectedItem.price + addonsTotal;
         const finalTotal = singleTotal * this.detailQuantity;
 
-        const btn = document.getElementById('sheet-submit-add-btn');
         btn.innerHTML = `ADD TO CART • ${formatCurrency(finalTotal, currency)}`;
     }
 
@@ -733,6 +771,10 @@ class CustomerApp {
         // Create order via Supabase Store (sub-second broadcast)
         const order = this.store.createOrder(orderData);
 
+        // Immediately store order_number as stable tracker reference
+        // (fb_active_order_id starts as temp ID; fb_active_order_number is always stable)
+        localStorage.setItem('fb_active_order_number', order.order_number);
+
         // Clear customer cart
         this.cart = [];
         this.appliedDiscount = 0;
@@ -920,7 +962,14 @@ class CustomerApp {
             const input = document.getElementById('main-search-input');
             if (input) input.focus();
         } else if (tab === 'orders') {
-            this.renderOrdersHistoryView();
+            // Sync from Supabase first for fresh statuses, then render
+            if (this.store && this.store.syncOrdersFromSupabase) {
+                this.store.syncOrdersFromSupabase()
+                    .then(() => this.renderOrdersHistoryView())
+                    .catch(() => this.renderOrdersHistoryView());
+            } else {
+                this.renderOrdersHistoryView();
+            }
         } else if (tab === 'favorites') {
             this.renderFavoritesView();
         }
@@ -1208,9 +1257,15 @@ class CustomerApp {
 
         // Realtime Order status change listener
         this.store.subscribe('ORDER_STATUS_CHANGED', (event) => {
-            const activeId = localStorage.getItem('fb_active_order_id');
-            const activeOrder = activeId ? this.store.getOrderById(activeId) : null;
-            
+            const activeId  = localStorage.getItem('fb_active_order_id');
+            const activeNum = localStorage.getItem('fb_active_order_number');
+
+            // Find active order by UUID or order_number (robust cross-device matching)
+            let activeOrder = activeId ? this.store.getOrderById(activeId) : null;
+            if (!activeOrder && activeNum) {
+                activeOrder = this.store.getOrders().find(o => o.order_number === activeNum) || null;
+            }
+
             const isMatch = activeOrder && (
                 activeOrder.id === event.orderId ||
                 activeOrder.order_number === event.orderNumber ||
@@ -1218,7 +1273,13 @@ class CustomerApp {
             );
 
             if (isMatch) {
-                const refreshedOrder = this.store.getOrderById(activeOrder.id);
+                // Keep fb_active_order_id current if we now have the Supabase UUID
+                if (event.orderId && event.orderId !== activeId && !event.orderId.startsWith('order-fb-')) {
+                    localStorage.setItem('fb_active_order_id', event.orderId);
+                }
+
+                const refreshedOrder = this.store.getOrderById(activeOrder.id) ||
+                    this.store.getOrders().find(o => o.order_number === activeOrder.order_number);
                 if (refreshedOrder) {
                     this._updateTrackerStatusUI(refreshedOrder);
                     this.showActiveOrderBanner(refreshedOrder);
@@ -1241,6 +1302,26 @@ class CustomerApp {
                 }
             }
 
+            if (this.activeTab === 'orders') {
+                this.renderOrdersHistoryView();
+            }
+        });
+
+        // DATA_REFRESH: triggered by periodic Supabase sync
+        this.store.subscribe('DATA_REFRESH', () => {
+            const activeId  = localStorage.getItem('fb_active_order_id');
+            const activeNum = localStorage.getItem('fb_active_order_number');
+            let fresh = activeId ? this.store.getOrderById(activeId) : null;
+            if (!fresh && activeNum) {
+                fresh = this.store.getOrders().find(o => o.order_number === activeNum) || null;
+            }
+            if (fresh && fresh.status !== 'served') {
+                this.showActiveOrderBanner(fresh);
+                const modal = document.getElementById('order-tracker-modal');
+                if (modal && modal.classList.contains('active')) {
+                    this._updateTrackerStatusUI(fresh);
+                }
+            }
             if (this.activeTab === 'orders') {
                 this.renderOrdersHistoryView();
             }
