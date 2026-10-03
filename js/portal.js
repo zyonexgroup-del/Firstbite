@@ -104,10 +104,9 @@ class PortalController {
         const iframes = document.querySelectorAll('.device-iframe');
         iframes.forEach(iframe => {
             try {
-                iframe.contentWindow.location.reload();
-            } catch (e) {
-                iframe.src = iframe.src;
-            }
+                const currentSrc = iframe.getAttribute('src');
+                if (currentSrc) iframe.setAttribute('src', currentSrc);
+            } catch (e) {}
         });
     }
 

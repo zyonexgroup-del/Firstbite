@@ -3,6 +3,16 @@
 // Kitchen Display, Mobile Tabs, Sound Alerts, 86'd Stock
 // ==========================================================
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 class StaffApp {
     constructor() {
         this.store = window.firstBiteStore;
@@ -10,11 +20,17 @@ class StaffApp {
         this.searchQuery = '';
         this.tickerInterval = null;
         this.isMobile = window.innerWidth < 900;
+        this.alertedOrders = new Set();
+        this.enteredPin = '';
 
         this.init();
     }
 
     async init() {
+        // Always require PIN on every page load — never auto-restore a session silently
+        this.store.logoutStaff();
+        this.selectedStaffForPin = null;
+        this.checkStaffSession();
         this.renderStats();
         this.renderAll();
         this.updateKitchenStatusUI();
@@ -588,17 +604,48 @@ class StaffApp {
             this.searchQuery = e.target.value.trim();
             this.renderAll();
         });
+
+        // Staff PIN Keypad — handled via inline onclick in HTML, only keyboard fallback needed here
+        // (removing addEventListener duplicates that would fire each digit twice)
+
+        // Physical Keyboard for PIN typing
+        document.addEventListener('keydown', (e) => {
+            const overlay = document.getElementById('staff-pin-overlay');
+            if (overlay && overlay.style.display !== 'none') {
+                if (e.key >= '0' && e.key <= '9') {
+                    e.preventDefault();
+                    this.handlePinDigit(e.key);
+                } else if (e.key === 'Backspace') {
+                    e.preventDefault();
+                    this.backspacePin();
+                } else if (e.key === 'Escape' || e.key === 'Delete') {
+                    e.preventDefault();
+                    this.clearPin();
+                }
+            }
+        });
     }
 
     setupRealtimeListeners() {
         this.store.subscribe('ORDER_CREATED', (event) => {
-            if (window.sounds) window.sounds.playOrderAlert();
-            if (event && event.order && event.order.order_number) {
-                showToast(`🔔 NEW ORDER: ${event.order.order_number} — ${event.order.customer_name || 'Guest'}`, 'warning', 6000);
+            const order = event && event.order;
+            const orderKey = order ? (order.order_number || order.id) : null;
+
+            if (orderKey) {
+                if (this.alertedOrders.has(orderKey)) {
+                    // Already alerted this order in this session, do not duplicate sound/toast
+                    this.renderAll();
+                    return;
+                }
+                this.alertedOrders.add(orderKey);
+
+                if (window.sounds) window.sounds.playOrderAlert();
+                showToast(`🔔 NEW ORDER: ${order.order_number} — ${order.customer_name || 'Guest'}`, 'warning', 6000);
             }
             this.renderAll();
         });
 
+        this.store.subscribe('ORDER_SYNCED',         () => this.renderAll());
         this.store.subscribe('ORDER_STATUS_CHANGED', () => this.renderAll());
         this.store.subscribe('ORDER_PAID',           () => this.renderAll());
         this.store.subscribe('DATA_REFRESH',         () => this.renderAll());
@@ -624,7 +671,192 @@ class StaffApp {
                 this.openStockModal();
             }
         });
+
+        this.store.subscribe('STAFF_SESSION_CHANGED', () => {
+            this.checkStaffSession();
+        });
+
+        this.store.subscribe('STAFF_UPDATED', () => {
+            this.renderQuickStaffChips();
+        });
     }
 }
+
+// ══════════════════════════════════════════════════════════════
+// STAFF PIN & TERMINAL ACCESS CONTROLLER
+// ══════════════════════════════════════════════════════════════
+
+StaffApp.prototype.checkStaffSession = function() {
+    const session = this.store.getStaffSession();
+    const overlay = document.getElementById('staff-pin-overlay');
+    const nameEl = document.getElementById('staff-session-name');
+    const iconEl = document.getElementById('staff-session-icon');
+
+    if (session) {
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.style.display = 'none';
+        }
+        if (nameEl) {
+            const firstName = (session.name || 'Staff').split(' ')[0];
+            nameEl.textContent = firstName;
+        }
+        if (iconEl) {
+            const r = (session.role || '').toLowerCase();
+            if (r.includes('chef')) iconEl.textContent = '👨‍🍳';
+            else if (r.includes('waiter') || r.includes('captain')) iconEl.textContent = '🤵';
+            else if (r.includes('cashier') || r.includes('pos')) iconEl.textContent = '💵';
+            else iconEl.textContent = '🛡️';
+        }
+    } else {
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.classList.add('active');
+        }
+        this.clearPin();
+        this.renderQuickStaffChips();
+    }
+};
+
+StaffApp.prototype.renderQuickStaffChips = function() {
+    const container = document.getElementById('quick-staff-chips');
+    if (!container) return;
+
+    const list = this.store.getStaffMembers().filter(s => s.active !== false);
+    if (list.length === 0) {
+        container.innerHTML = `<span style="font-size:11px;color:#94A3B8;">No active staff.</span>`;
+        return;
+    }
+
+    container.innerHTML = list.map(s => {
+        const r = (s.role || '').toLowerCase();
+        let icon = '👤';
+        if (r.includes('chef')) icon = '👨‍🍳';
+        else if (r.includes('waiter') || r.includes('captain')) icon = '🤵';
+        else if (r.includes('cashier')) icon = '💵';
+        const firstName = s.name.split(' ')[0];
+        return `<button type="button" data-staff-id="${s.id}" data-staff-pin="${s.pin}" style="padding:5px 11px;font-size:11.5px;font-weight:700;border-radius:14px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.12);cursor:pointer;transition:all 0.15s;" onclick="window.staffApp.selectQuickStaff('${s.id}', '${escapeHtml(s.name)}', '${s.pin}')">${icon} ${escapeHtml(firstName)} (${s.pin})</button>`;
+    }).join('');
+};
+
+StaffApp.prototype.selectQuickStaff = function(staffId, name, pin) {
+    this.selectedStaffForPin = { id: staffId, name, pin: pin || '1234' };
+    this.clearPin();
+
+    // Update chip visual highlight
+    const container = document.getElementById('quick-staff-chips');
+    if (container) {
+        container.querySelectorAll('button').forEach(btn => {
+            const isSelected = btn.dataset.staffId === staffId;
+            btn.style.background = isSelected ? 'var(--primary)' : '#334155';
+            btn.style.borderColor = isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.12)';
+        });
+    }
+
+    const firstName = (name || '').split(' ')[0];
+    const hintEl = document.getElementById('pin-staff-hint');
+    if (hintEl) {
+        hintEl.innerHTML = `Selected: <b>${escapeHtml(name)}</b> • Enter PIN <code>${pin || '1234'}</code> below or tap Fast Unlock`;
+        hintEl.style.display = 'block';
+    }
+
+    // Update fast unlock button to match this selected staff
+    const fastBtn = document.getElementById('staff-fast-unlock-btn');
+    if (fastBtn) {
+        fastBtn.innerHTML = `⚡ 1-Click Fast Unlock as ${escapeHtml(firstName)} (${pin || '1234'})`;
+        fastBtn.onclick = () => this.fastUnlockStaff(pin || '1234');
+    }
+};
+
+StaffApp.prototype.fastUnlockStaff = function(pin) {
+    this.enteredPin = String(pin || '1234');
+    this.updatePinDots();
+    setTimeout(() => this.submitPin(), 120);
+};
+
+StaffApp.prototype.handlePinDigit = function(digit) {
+    if (this.enteredPin.length >= 4) return;
+    this.enteredPin += String(digit);
+    if (window.sounds) window.sounds.playClick();
+    this.updatePinDots();
+
+    // Clear any previous error as soon as user enters input
+    const errEl = document.getElementById('pin-error-msg');
+    if (errEl) errEl.style.display = 'none';
+
+    if (this.enteredPin.length === 4) {
+        // Small visual delay so the 4th dot fills before submitting
+        setTimeout(() => this.submitPin(), 180);
+    }
+};
+
+StaffApp.prototype.submitPin = function() {
+    const res = this.store.loginStaff(this.enteredPin);
+    const errEl = document.getElementById('pin-error-msg');
+    const boxEl = document.getElementById('pin-indicator-box');
+
+    if (res.success) {
+        if (errEl) errEl.style.display = 'none';
+        this.checkStaffSession();
+        if (window.sounds) window.sounds.playSuccess();
+        showToast(`Terminal Unlocked: Welcome ${res.staff.name}! 👨‍🍳`, 'success');
+        this.enteredPin = '';
+        this.updatePinDots();
+    } else {
+        if (errEl) {
+            errEl.textContent = res.error || 'Incorrect 4-digit PIN — please try again';
+            errEl.style.display = 'block';
+        }
+        if (boxEl) {
+            boxEl.style.animation = 'none';
+            void boxEl.offsetWidth; // trigger reflow
+            boxEl.style.borderColor = '#EF4444';
+        }
+        if (window.sounds) window.sounds.playClick();
+        setTimeout(() => {
+            this.enteredPin = '';
+            this.updatePinDots();
+            if (boxEl) boxEl.style.borderColor = 'rgba(255,255,255,0.06)';
+        }, 500);
+    }
+};
+
+StaffApp.prototype.clearPin = function() {
+    this.enteredPin = '';
+    const errEl = document.getElementById('pin-error-msg');
+    if (errEl) errEl.style.display = 'none';
+    const hintEl = document.getElementById('pin-staff-hint');
+    if (hintEl) hintEl.style.display = 'none';
+    this.updatePinDots();
+};
+
+StaffApp.prototype.backspacePin = function() {
+    if (this.enteredPin.length > 0) {
+        this.enteredPin = this.enteredPin.slice(0, -1);
+        this.updatePinDots();
+    }
+};
+
+StaffApp.prototype.updatePinDots = function() {
+    for (let i = 0; i < 4; i++) {
+        const dot = document.getElementById(`pindot-${i}`);
+        if (!dot) continue;
+        if (i < this.enteredPin.length) {
+            dot.style.background = '#10B981';
+            dot.style.borderColor = '#10B981';
+            dot.style.transform = 'scale(1.15)';
+        } else {
+            dot.style.background = 'transparent';
+            dot.style.borderColor = '#64748B';
+            dot.style.transform = 'scale(1)';
+        }
+    }
+};
+
+StaffApp.prototype.lockTerminal = function() {
+    this.store.logoutStaff();
+    this.checkStaffSession();
+    showToast('Terminal Locked 🔒', 'info');
+};
 
 window.staffApp = new StaffApp();

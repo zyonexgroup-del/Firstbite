@@ -9,6 +9,7 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="alternate icon" href="favicon.svg">
+    <link rel="icon" type="image/png" href="./favicon.png">
 
     <!-- Design Tokens & Styles -->
     <link rel="stylesheet" href="css/common.css">
@@ -231,6 +232,9 @@
                     </div>
                     <div id="promo-hint-pills" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
                         <!-- Dynamic promo chips -->
+                    </div>
+                    <div id="applied-promo-tag" style="display: none; margin-top: 8px;">
+                        <!-- Injected when coupon is active -->
                     </div>
 
                     <div class="bill-breakdown">
@@ -469,9 +473,9 @@
     <!-- Scripts -->
     <script src="js/supabase-sdk.min.js"></script>
     <script>if(!window.supabase){document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>')}</script>
-    <script src="js/sound-effects.js"></script>
-    <script src="js/supabase-client.js"></script>
-    <script src="js/common.js"></script>
-    <script src="js/customer.js"></script>
+    <script src="js/sound-effects.js?v=3.0"></script>
+    <script src="js/supabase-client.js?v=3.0"></script>
+    <script src="js/common.js?v=3.0"></script>
+    <script src="js/customer.js?v=3.0"></script>
 </body>
 </html>

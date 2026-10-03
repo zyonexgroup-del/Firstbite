@@ -192,9 +192,15 @@ class CustomerApp {
         const currency = restaurant.currency || '₹';
 
         let filtered = menu.filter(item => {
-            // Category filter
-            if (this.activeCategory !== 'all' && item.category_id !== this.activeCategory) {
-                return false;
+            // Category filter (matches local slug ID or Supabase cloud UUID)
+            if (this.activeCategory !== 'all') {
+                const itemCat = item.category_id;
+                const activeCat = this.activeCategory;
+                const isMatch = (itemCat === activeCat) || (this.store.getCategories().some(c => 
+                    (c.id === activeCat && (c.cloud_id === itemCat || c.id === itemCat)) ||
+                    (c.cloud_id === activeCat && (c.id === itemCat || c.cloud_id === itemCat))
+                ));
+                if (!isMatch) return false;
             }
             // Dietary filter
             if (this.activeDiet === 'veg' && !item.is_veg) return false;
@@ -460,6 +466,14 @@ class CustomerApp {
             });
         }
 
+        if (this.appliedCouponCode) {
+            const summary = this.getCartSummary();
+            const check = this.store.validateCoupon(this.appliedCouponCode, summary.subtotal);
+            if (check.valid) {
+                this.appliedDiscount = check.discount;
+            }
+        }
+
         this._saveCart();
     }
 
@@ -469,8 +483,22 @@ class CustomerApp {
         if (this.cart[index].quantity <= 0) {
             this.cart.splice(index, 1);
         }
+        if (this.appliedCouponCode) {
+            const summary = this.getCartSummary();
+            const check = this.store.validateCoupon(this.appliedCouponCode, summary.subtotal);
+            if (check.valid) {
+                this.appliedDiscount = check.discount;
+            } else {
+                this.appliedDiscount = 0;
+                this.appliedCouponCode = '';
+                const promoInput = document.getElementById('promo-input');
+                if (promoInput) promoInput.value = '';
+                showToast(`Promo removed: ${check.message}`, 'warning');
+            }
+        }
         this._saveCart();
         this.renderCartModal();
+        this.updateCartBar();
     }
 
     getCartSummary() {
@@ -591,18 +619,43 @@ class CustomerApp {
             discountRow.style.display = summary.discount > 0 ? 'flex' : 'none';
         }
 
-        // Render promo hint pills from store coupons
+        // Render promo hint pills from store coupons (only publicly visible coupons)
         const promoPillsContainer = document.getElementById('promo-hint-pills');
         if (promoPillsContainer) {
-            const activeCoupons = this.store.getCoupons().filter(c => c.is_active);
+            const activeCoupons = this.store.getCoupons().filter(c => c.is_active && c.is_visible !== false);
             if (activeCoupons.length > 0) {
-                promoPillsContainer.innerHTML = activeCoupons.map(c => `
-                    <button type="button" class="promo-hint-chip" onclick="window.customerApp.applyPromoCode('${c.code}')" style="font-size:11px;background:#ECFDF5;color:#065F46;border:1px dashed #6EE7B7;border-radius:20px;padding:3px 9px;cursor:pointer;font-weight:700;">
-                        🎟️ ${c.code} (${c.discount_type === 'percent' ? c.discount_value + '% OFF' : currency + c.discount_value + ' OFF'})
+                promoPillsContainer.innerHTML = activeCoupons.map(c => {
+                    const isPct = c.discount_type === 'percentage' || c.discount_type === 'percent';
+                    const label = isPct ? `${c.discount_value}% OFF` : `${currency}${c.discount_value} OFF`;
+                    const minAmt = Number(c.min_order_amount ?? c.min_order_value) || 0;
+                    const minText = minAmt > 0 ? ` (Min ₹${minAmt})` : '';
+                    const isApplied = this.appliedCouponCode && this.appliedCouponCode.toUpperCase() === c.code.toUpperCase();
+                    return `
+                    <button type="button" class="promo-hint-chip" onclick="window.customerApp.applyPromoCode('${c.code}')" 
+                            style="font-size:11px;background:${isApplied ? '#DCFCE7' : '#ECFDF5'};color:${isApplied ? '#15803D' : '#065F46'};border:1px dashed ${isApplied ? '#16A34A' : '#6EE7B7'};border-radius:20px;padding:3px 9px;cursor:pointer;font-weight:700;">
+                        🎟️ ${c.code} (${label}${minText}) ${isApplied ? '✓' : ''}
                     </button>
-                `).join('');
+                    `;
+                }).join('');
             } else {
                 promoPillsContainer.innerHTML = '';
+            }
+        }
+
+        // Render applied promo badge with clear remove button
+        const appliedTag = document.getElementById('applied-promo-tag');
+        if (appliedTag) {
+            if (this.appliedCouponCode && summary.discount > 0) {
+                appliedTag.style.display = 'block';
+                appliedTag.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:space-between;background:#F0FDF4;border:1px solid #BBF7D0;padding:8px 12px;border-radius:8px;">
+                        <span style="font-weight:700;color:#16A34A;font-size:12.5px;">🎟️ <b>${this.appliedCouponCode}</b> Applied (-${formatCurrency(summary.discount, currency)})</span>
+                        <button type="button" onclick="window.customerApp.removePromoCode()" style="background:none;border:none;color:#DC2626;font-size:12px;font-weight:700;cursor:pointer;padding:2px 6px;">✕ Remove</button>
+                    </div>
+                `;
+            } else {
+                appliedTag.style.display = 'none';
+                appliedTag.innerHTML = '';
             }
         }
     }
@@ -610,11 +663,7 @@ class CustomerApp {
     applyPromoCode(code) {
         code = (code || '').trim().toUpperCase();
         if (!code) {
-            this.appliedDiscount = 0;
-            this.appliedCouponCode = '';
-            showToast('Promo code removed', 'info');
-            this.renderCartModal();
-            this.updateCartBar();
+            this.removePromoCode();
             return;
         }
 
@@ -634,6 +683,16 @@ class CustomerApp {
         showToast(result.message, 'success');
         if (window.sounds) window.sounds.playClick();
 
+        this.renderCartModal();
+        this.updateCartBar();
+    }
+
+    removePromoCode() {
+        this.appliedDiscount = 0;
+        this.appliedCouponCode = '';
+        const promoInput = document.getElementById('promo-input');
+        if (promoInput) promoInput.value = '';
+        showToast('Promo code removed', 'info');
         this.renderCartModal();
         this.updateCartBar();
     }
@@ -908,36 +967,75 @@ class CustomerApp {
                 z-index: 850;
                 box-shadow: 0 4px 16px rgba(0,0,0,0.25);
                 cursor: pointer;
+                touch-action: pan-y;
+                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
             `;
             document.body.appendChild(banner);
-            banner.addEventListener('click', () => {
+
+            banner.addEventListener('click', (e) => {
+                if (e.target.closest('.banner-close-btn')) return;
                 this.openOrderTracker(order.id);
+            });
+
+            // Swipe to dismiss floating banner
+            let bStartX = 0;
+            let bStartY = 0;
+            let bDragging = false;
+
+            banner.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) {
+                    bStartX = e.touches[0].clientX;
+                    bStartY = e.touches[0].clientY;
+                    bDragging = true;
+                    banner.style.transition = 'none';
+                }
+            }, { passive: true });
+
+            banner.addEventListener('touchmove', (e) => {
+                if (!bDragging) return;
+                const dx = e.touches[0].clientX - bStartX;
+                const dy = e.touches[0].clientY - bStartY;
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
+                    banner.style.transform = `translateX(calc(-50% + ${dx}px))`;
+                    banner.style.opacity = `${Math.max(0.1, 1 - Math.abs(dx) / 200)}`;
+                }
+            }, { passive: true });
+
+            banner.addEventListener('touchend', (e) => {
+                if (!bDragging) return;
+                bDragging = false;
+                const clientX = e.changedTouches[0]?.clientX || bStartX;
+                const dx = clientX - bStartX;
+                if (Math.abs(dx) > 65) {
+                    banner.style.transition = 'all 0.25s ease';
+                    banner.style.transform = `translateX(${dx > 0 ? '120%' : '-120%'})`;
+                    banner.style.opacity = '0';
+                    setTimeout(() => banner.remove(), 260);
+                } else {
+                    banner.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
+                    banner.style.transform = 'translateX(-50%)';
+                    banner.style.opacity = '1';
+                }
             });
         }
 
-        if (order.status === 'cancelled') {
-            banner.style.background = '#FEF2F2';
-            banner.style.color = '#DC2626';
-            banner.style.border = '1.5px solid #FECACA';
-            banner.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span>❌</span>
-                    <span>Order <b>${order.order_number}</b> was <span style="font-weight:800;">CANCELLED</span></span>
-                </div>
-                <span style="font-weight: 700; font-size: 12px;">Details →</span>
-            `;
-        } else {
-            banner.style.background = '#171717';
-            banner.style.color = '#FFFFFF';
-            banner.style.border = 'none';
-            banner.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="pulse-dot"></span>
-                    <span>Active Order <b>${order.order_number}</b> • <span style="text-transform: capitalize; color: #4ADE80;">${order.status}</span></span>
-                </div>
-                <span style="font-weight: 700; color: #4ADE80; font-size: 12px;">Track →</span>
-            `;
-        }
+        const isCancelled = order.status === 'cancelled';
+        banner.style.background = isCancelled ? '#FEF2F2' : '#171717';
+        banner.style.color = isCancelled ? '#DC2626' : '#FFFFFF';
+        banner.style.border = isCancelled ? '1.5px solid #FECACA' : 'none';
+
+        banner.innerHTML = `
+            <div style="display:flex;align-items:center;gap:8px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                <span>${isCancelled ? '❌' : '<span class="pulse-dot"></span>'}</span>
+                <span style="overflow:hidden;text-overflow:ellipsis;">
+                    ${isCancelled ? `Order <b>${order.order_number}</b> CANCELLED` : `Active <b>${order.order_number}</b> • <span style="text-transform:capitalize;color:#4ADE80;">${order.status}</span>`}
+                </span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                <span style="font-weight:700;font-size:12px;color:${isCancelled ? '#DC2626' : '#4ADE80'};">${isCancelled ? 'Details →' : 'Track →'}</span>
+                <button type="button" class="banner-close-btn" onclick="event.stopPropagation(); this.closest('#active-order-floating-banner').remove();" style="background:none;border:none;color:inherit;opacity:0.6;font-size:14px;cursor:pointer;padding:2px 4px;line-height:1;font-weight:800;" title="Dismiss">✕</button>
+            </div>
+        `;
     }
 
     // ----------------------------------------------------
@@ -1338,6 +1436,14 @@ class CustomerApp {
             this.renderHeader();
             this.renderMenuItems();
             this.updateCartBar();
+        });
+
+        // Realtime Coupon updates
+        this.store.subscribe('COUPONS_UPDATED', () => {
+            const promoModal = document.getElementById('cart-drawer-modal');
+            if (promoModal && promoModal.classList.contains('active')) {
+                this.renderCartModal();
+            }
         });
     }
 }

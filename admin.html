@@ -74,13 +74,14 @@
         </div>
 
         <nav class="sidebar-nav">
-            <div class="sidebar-link" data-view="dashboard">📊 <span>Dashboard</span></div>
-            <div class="sidebar-link" data-view="orders">📋 <span>Live Orders</span></div>
-            <div class="sidebar-link" data-view="menu">🍔 <span>Menu Catalog</span></div>
-            <div class="sidebar-link" data-view="categories">🏷️ <span>Categories</span></div>
-            <div class="sidebar-link" data-view="coupons">🎟️ <span>Coupons &amp; Promos</span></div>
-            <div class="sidebar-link" data-view="qrcodes">📲 <span>Table QR Codes</span></div>
-            <div class="sidebar-link" data-view="settings">⚙️ <span>Settings</span></div>
+            <div class="sidebar-link" data-view="dashboard" onclick="window.adminApp.switchView('dashboard')">📊 <span>Dashboard</span></div>
+            <div class="sidebar-link" data-view="orders" onclick="window.adminApp.switchView('orders')">📋 <span>Live Orders</span></div>
+            <div class="sidebar-link" data-view="menu" onclick="window.adminApp.switchView('menu')">🍔 <span>Menu Catalog</span></div>
+            <div class="sidebar-link" data-view="categories" onclick="window.adminApp.switchView('categories')">🏷️ <span>Categories</span></div>
+            <div class="sidebar-link" data-view="coupons" onclick="window.adminApp.switchView('coupons')">🎟️ <span>Coupons &amp; Promos</span></div>
+            <div class="sidebar-link" data-view="qrcodes" onclick="window.adminApp.switchView('qrcodes')">📲 <span>Table QR Codes</span></div>
+            <div class="sidebar-link" data-view="staff" onclick="window.adminApp.switchView('staff')">👥 <span>Staff &amp; Access</span></div>
+            <div class="sidebar-link" data-view="settings" onclick="window.adminApp.switchView('settings')">⚙️ <span>Settings</span></div>
         </nav>
 
         <div class="sidebar-footer">
@@ -101,7 +102,12 @@
                     <span class="status-indicator-dot" id="admin-kitchen-dot" style="width:8px;height:8px;border-radius:50%;background:#10B981;"></span>
                     <span id="admin-kitchen-text">Kitchen Open</span>
                 </button>
-                <a href="customer.html" target="_blank" class="btn-secondary" style="font-size:12.5px;text-decoration:none;">📱 Customer App</a>
+                <div class="admin-user-pill" style="display:flex;align-items:center;gap:6px;background:#F8FAFC;border:1px solid #CBD5E1;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;">
+                    <span>🛡️</span>
+                    <span id="admin-user-badge">Admin</span>
+                    <button type="button" id="admin-logout-btn" onclick="window.adminApp.handleAdminLogout()" title="Sign Out" style="background:none;border:none;cursor:pointer;color:#DC2626;font-size:12px;font-weight:700;padding:2px 4px;margin-left:4px;border-radius:4px;">Logout</button>
+                </div>
+                <a href="index.html" target="_blank" class="btn-secondary" style="font-size:12.5px;text-decoration:none;">📱 Customer App</a>
                 <a href="staff.html"   target="_blank" class="btn-secondary" style="font-size:12.5px;text-decoration:none;">👨‍🍳 Staff App</a>
             </div>
         </header>
@@ -318,6 +324,21 @@
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px;align-items:start;">
                     <div>
+                        <!-- Domain / Hostname Setting -->
+                        <div style="background:var(--bg-soft);padding:14px;border-radius:10px;border:1px solid var(--border-light);margin-bottom:14px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                <label style="font-size:12px;font-weight:700;color:var(--text-secondary);">🌐 Permanent Domain / Host URL</label>
+                                <button type="button" id="qr-reset-domain-btn" class="btn-secondary" style="font-size:11px;padding:3px 8px;border-radius:6px;" title="Reset to current browser URL">Auto-Detect</button>
+                            </div>
+                            <div style="display:flex;gap:6px;">
+                                <input type="text" id="qr-domain-input" placeholder="e.g. https://myrestaurant.com" style="flex:1;font-size:13px;padding:8px 10px;font-family:monospace;">
+                                <button type="button" id="qr-save-domain-btn" class="btn-primary" style="font-size:12px;padding:8px 14px;">Save</button>
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">
+                                ℹ️ When your permanent domain is ready, set it here so all printed QR codes point to it.
+                            </div>
+                        </div>
+
                         <label style="font-size:13px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:8px;">Select Dining Table</label>
                         <select id="qr-table-select" style="width:100%;font-size:15px;font-weight:700;padding:10px 12px;margin-bottom:14px;">
                             <option value="1">Table 1 (Window Side)</option>
@@ -332,16 +353,25 @@
                             <option value="10">Table 10</option>
                         </select>
 
-                        <div style="background:var(--bg-soft);padding:14px;border-radius:10px;border:1px solid var(--border-light);margin-bottom:14px;">
-                            <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">Direct Menu URL</div>
-                            <div id="qr-link-url" style="font-family:monospace;font-size:12px;color:var(--primary);word-break:break-all;font-weight:700;">customer.html?table=4</div>
+                        <div style="background:var(--bg-soft);padding:14px;border-radius:10px;border:1px solid var(--border-light);margin-bottom:12px;">
+                            <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px;">Direct Menu URL (Scanned by Customers)</div>
+                            <div id="qr-link-url" style="font-family:monospace;font-size:12px;color:var(--primary);word-break:break-all;font-weight:700;">index.html?table=4</div>
+                        </div>
+
+                        <div style="display:flex;gap:8px;margin-bottom:10px;">
+                            <button id="qr-copy-url-btn" type="button" class="btn-secondary" style="flex:1;font-size:12.5px;padding:9px;">
+                                📋 Copy Link
+                            </button>
+                            <button id="qr-download-btn" type="button" class="btn-secondary" style="flex:1;font-size:12.5px;padding:9px;">
+                                ⬇️ Download QR
+                            </button>
                         </div>
 
                         <div style="display:flex;gap:10px;">
-                            <a id="qr-test-btn" href="customer.html?table=4" target="_blank" class="btn-secondary" style="flex:1;text-align:center;text-decoration:none;font-size:13px;padding:10px;">
+                            <a id="qr-test-btn" href="index.html?table=4" target="_blank" class="btn-secondary" style="flex:1;text-align:center;text-decoration:none;font-size:13px;padding:10px;">
                                 🚀 Test Customer Link
                             </a>
-                            <button id="qr-print-btn" class="btn-primary" style="flex:1;font-size:13px;padding:10px;">
+                            <button id="qr-print-btn" type="button" class="btn-primary" style="flex:1;font-size:13px;padding:10px;">
                                 🖨️ Print Stand
                             </button>
                         </div>
@@ -366,13 +396,69 @@
         </section>
 
         <!-- ══════════════════════════════════════════════════════
+             VIEW: STAFF & ACCESS
+        ══════════════════════════════════════════════════════════ -->
+        <section class="admin-content-view" id="view-staff">
+            <div class="card-panel">
+                <div class="panel-header">
+                    <div>
+                        <h3 class="panel-title">👥 Staff Roster &amp; Terminal PIN Access</h3>
+                        <p style="font-size:12px;color:var(--text-secondary);">Create staff logins for Kitchen Chefs, Floor Captains, and Cashiers with 4-digit numeric PINs</p>
+                    </div>
+                    <button class="btn-primary" id="add-staff-btn" onclick="window.adminApp.openStaffModal()" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                        <span>+ Add Staff Member</span>
+                    </button>
+                </div>
+
+                <!-- Quick Stats Grid -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:12px;margin-bottom:20px;">
+                    <div style="background:var(--bg-soft);border:1px solid var(--border-light);padding:14px 18px;border-radius:10px;">
+                        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Total Staff</div>
+                        <div style="font-size:22px;font-weight:800;color:var(--text-primary);margin-top:4px;" id="staff-stat-total">0</div>
+                    </div>
+                    <div style="background:var(--bg-soft);border:1px solid var(--border-light);padding:14px 18px;border-radius:10px;">
+                        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Kitchen Chefs</div>
+                        <div style="font-size:22px;font-weight:800;color:#2563EB;margin-top:4px;" id="staff-stat-chefs">0</div>
+                    </div>
+                    <div style="background:var(--bg-soft);border:1px solid var(--border-light);padding:14px 18px;border-radius:10px;">
+                        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Floor Captains</div>
+                        <div style="font-size:22px;font-weight:800;color:#059669;margin-top:4px;" id="staff-stat-waiters">0</div>
+                    </div>
+                    <div style="background:var(--bg-soft);border:1px solid var(--border-light);padding:14px 18px;border-radius:10px;">
+                        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Cashiers / POS</div>
+                        <div style="font-size:22px;font-weight:800;color:#D97706;margin-top:4px;" id="staff-stat-cashiers">0</div>
+                    </div>
+                </div>
+
+                <!-- Staff Table -->
+                <div class="table-container">
+                    <table class="admin-table" id="staff-table">
+                        <thead>
+                            <tr>
+                                <th>Staff Name</th>
+                                <th>Role</th>
+                                <th>Terminal PIN</th>
+                                <th>Contact Phone</th>
+                                <th>Status</th>
+                                <th style="text-align:right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="staff-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════
              VIEW: SETTINGS
         ══════════════════════════════════════════════════════════ -->
         <section class="admin-content-view" id="view-settings">
             <div class="card-panel" style="max-width:720px;">
                 <div class="panel-header">
                     <div>
-                        <h3 class="panel-title">Restaurant Profile & Settings</h3>
+                        <h3 class="panel-title">Restaurant Profile &amp; Settings</h3>
                         <p style="font-size:12px;color:var(--text-secondary);">Changes broadcast instantly to all apps via Supabase Realtime</p>
                     </div>
                 </div>
@@ -414,7 +500,95 @@
                     </div>
                     <div>
                         <button class="btn-primary" id="save-settings-btn" style="padding:12px 28px;">
-                            Save & Broadcast Changes ⚡
+                            Save &amp; Broadcast Changes ⚡
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Master Password & Admin Access Card -->
+            <div class="card-panel" style="max-width:720px;margin-top:20px;">
+                <div class="panel-header">
+                    <div>
+                        <h3 class="panel-title" style="display:flex;align-items:center;gap:8px;">
+                            🛡️ Master Admin Password &amp; Security
+                        </h3>
+                        <p style="font-size:12px;color:var(--text-secondary);">Manage the master password required to access this Operations Dashboard</p>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div>
+                            <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Current Master Password</label>
+                            <input type="password" id="admin-current-pass" placeholder="Default: admin123" style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">New Master Password</label>
+                            <input type="password" id="admin-new-pass" placeholder="Min 4 characters" style="width:100%;">
+                        </div>
+                    </div>
+                    <div style="display:flex;justify-content:flex-end;">
+                        <button type="button" class="btn-primary" id="change-admin-pass-btn" onclick="window.adminApp.handleChangeMasterPassword()" style="cursor:pointer;">
+                            Update Master Password 🔒
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onboarding & Reset Management -->
+            <div class="card-panel" style="max-width:720px;margin-top:20px;border:1.5px solid #BBF7D0;background:#F0FDF4;">
+                <div class="panel-header" style="border-bottom:1px solid #DCFCE7;padding-bottom:12px;margin-bottom:16px;">
+                    <div>
+                        <h3 class="panel-title" style="color:#166534;display:flex;align-items:center;gap:8px;">
+                            🚀 Restaurant Owner Handover &amp; Clean Slate Wizard
+                        </h3>
+                        <p style="font-size:12px;color:#15803D;">Designed for selling this software to new restaurant owners or starting a brand-new tenant</p>
+                    </div>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <!-- Action 0: Owner Handover Wizard -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#FFFFFF;border:1.5px solid #86EFAC;border-radius:10px;gap:14px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-weight:800;font-size:14px;color:#166534;">✨ Launch New Owner Setup &amp; Handover Wizard</div>
+                            <div style="font-size:12px;color:#475569;margin-top:2px;">All-in-one wizard: set new restaurant name, new owner login credentials, fresh staff PINs, and zero out order history with one click.</div>
+                        </div>
+                        <button type="button" class="btn-primary" id="launch-handover-wizard-btn" onclick="window.adminApp.openHandoverWizard()" style="background:#16A34A;border-color:#16A34A;white-space:nowrap;font-weight:800;padding:10px 20px;cursor:pointer;">
+                            Launch Wizard 🚀
+                        </button>
+                    </div>
+
+                    <!-- Action 1: Clear Orders -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#FFFFFF;border:1px solid var(--border-light);border-radius:10px;gap:14px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-weight:700;font-size:13.5px;color:var(--text-primary);">🧹 Clear Orders &amp; Reset Sales History</div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Wipes active and past orders, resetting total revenue and analytics to zero. Keeps menu &amp; categories untouched.</div>
+                        </div>
+                        <button type="button" class="btn-secondary" id="reset-orders-btn" onclick="window.adminApp.clearAllOrders()" style="color:#B91C1C;border-color:#FCA5A5;white-space:nowrap;font-weight:700;cursor:pointer;">
+                            Clear All Orders
+                        </button>
+                    </div>
+
+                    <!-- Action 2: Wipe Catalog -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#FFFFFF;border:1px solid var(--border-light);border-radius:10px;gap:14px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-weight:700;font-size:13.5px;color:var(--text-primary);">✨ Clean Slate (Wipe Menu &amp; Categories)</div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Clears all demo items and categories so a new restaurant owner can build their own custom catalog from scratch.</div>
+                        </div>
+                        <button type="button" class="btn-secondary" id="wipe-catalog-btn" onclick="window.adminApp.wipeCatalog()" style="color:#C2410C;border-color:#FDBA74;white-space:nowrap;font-weight:700;cursor:pointer;">
+                            Wipe to Blank Slate
+                        </button>
+                    </div>
+
+                    <!-- Action 3: Factory Reset Demo -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#FFFFFF;border:1px solid var(--border-light);border-radius:10px;gap:14px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-weight:700;font-size:13.5px;color:var(--text-primary);">🔄 Restore Full Factory Demo Data</div>
+                            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Restores all default gourmet dishes, categories, coupons, staff roster, and sample restaurant profile.</div>
+                        </div>
+                        <button type="button" class="btn-secondary" id="reset-demo-btn" onclick="window.adminApp.factoryResetDemo()" style="color:#2563EB;border-color:#BFDBFE;white-space:nowrap;font-weight:700;cursor:pointer;">
+                            Restore Demo Data
                         </button>
                     </div>
                 </div>
@@ -610,10 +784,23 @@
                 <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Expires On (leave empty = no expiry)</label>
                 <input type="date" id="coupon-expiry-input" style="width:100%;">
             </div>
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:var(--bg-soft);border-radius:8px;">
-                <input type="checkbox" id="coupon-active-toggle" checked style="width:18px;height:18px;accent-color:var(--primary);">
-                <span style="font-weight:700;font-size:13.5px;">Active (visible to customers)</span>
-            </label>
+            <div style="display:flex;flex-direction:column;gap:10px;background:var(--bg-soft);padding:14px;border-radius:10px;border:1px solid var(--border-light);">
+                <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;">
+                    <input type="checkbox" id="coupon-active-toggle" checked style="width:18px;height:18px;accent-color:var(--primary);margin-top:2px;">
+                    <div>
+                        <div style="font-weight:700;font-size:13.5px;color:var(--text-primary);">⚡ Coupon Active (Redeemable)</div>
+                        <div style="font-size:11.5px;color:var(--text-secondary);margin-top:2px;">Allow customers to enter and redeem this promo code at checkout. If turned off, nobody can use it.</div>
+                    </div>
+                </label>
+                <div style="height:1px;background:var(--border-light);margin:2px 0;"></div>
+                <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;">
+                    <input type="checkbox" id="coupon-visible-toggle" checked style="width:18px;height:18px;accent-color:var(--primary);margin-top:2px;">
+                    <div>
+                        <div style="font-weight:700;font-size:13.5px;color:var(--text-primary);">👁️ Publicly Visible in Customer App</div>
+                        <div style="font-size:11.5px;color:var(--text-secondary);margin-top:2px;">Show as a clickable promo pill in the customer cart. <b>Turn OFF for secret/exclusive codes</b> (customers can still apply it by typing, but it won't be advertised publicly).</div>
+                    </div>
+                </label>
+            </div>
         </div>
         <div style="padding:16px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:10px;">
             <button class="btn-secondary" onclick="window.adminApp.closeCouponModal()">Cancel</button>
@@ -654,11 +841,194 @@
     </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════
+     MODAL: ADMIN MASTER LOGIN OVERLAY
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="admin-login-overlay" style="display:none;z-index:9999;backdrop-filter:blur(8px);background:rgba(15,23,42,0.85);align-items:center;justify-content:center;">
+    <div class="modal-card" style="max-width:400px;border-radius:18px;padding:32px 28px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);">
+        <div style="text-align:center;margin-bottom:24px;">
+            <div style="width:56px;height:56px;background:var(--primary);color:#FFF;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;margin:0 auto 12px;box-shadow:0 8px 16px rgba(226,55,68,0.35);">FB</div>
+            <h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:4px;">First Bite Operations</h2>
+            <p style="font-size:12.5px;color:var(--text-secondary);">Master Admin &amp; Restaurant Owner Portal</p>
+        </div>
+
+        <form id="admin-login-form" onsubmit="window.adminApp.handleAdminLogin(); return false;" style="display:flex;flex-direction:column;gap:16px;">
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Username</label>
+                <input type="text" id="admin-login-username" value="admin" style="width:100%;height:42px;" required autofocus autocomplete="username">
+            </div>
+            <div>
+                <label style="font-size:12px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Master Password</label>
+                <input type="password" id="admin-login-password" value="admin123" placeholder="Enter password..." style="width:100%;height:42px;" required autocomplete="current-password">
+            </div>
+            <div id="admin-login-error" style="display:none;background:#FEE2E2;color:#DC2626;padding:9px 12px;border-radius:8px;font-size:12px;font-weight:600;text-align:center;"></div>
+            <button type="submit" class="btn-primary" id="admin-login-submit-btn" onclick="window.adminApp.handleAdminLogin()" style="width:100%;height:44px;font-size:14px;font-weight:800;justify-content:center;margin-top:4px;cursor:pointer;">
+                Sign In to Dashboard 🔒
+            </button>
+            <div style="text-align:center;font-size:11.5px;color:var(--text-muted);background:var(--bg-soft);padding:10px;border-radius:8px;border:1px solid var(--border-light);">
+                Demo Master Credentials: <b>admin</b> / <b>admin123</b>
+                <button type="button" style="display:block;width:100%;height:34px;font-size:12px;font-weight:800;margin-top:8px;background:#FEF2F2;color:#DC2626;border:1px solid #FECACA;border-radius:6px;cursor:pointer;" onclick="document.getElementById('admin-login-username').value='admin';document.getElementById('admin-login-password').value='admin123';window.adminApp.handleAdminLogin();">
+                    ⚡ 1-Click Fast Login as Admin
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL: ADD / EDIT STAFF MEMBER
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="staff-modal">
+    <div class="modal-card" style="max-width:440px;">
+        <div class="flex-between" style="padding:18px 22px;border-bottom:1px solid var(--border-light);">
+            <h3 id="staff-modal-title" style="font-size:17px;font-weight:800;">Add Staff Member</h3>
+            <button class="btn-secondary" id="staff-modal-close-btn" onclick="window.adminApp.closeStaffModal()" style="width:32px;height:32px;border-radius:50%;padding:0;cursor:pointer;">✕</button>
+        </div>
+        <form id="staff-form" style="padding:22px;display:flex;flex-direction:column;gap:14px;" onsubmit="window.adminApp.saveStaffMember(); return false;">
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Staff Full Name *</label>
+                <input type="text" id="staff-name-input" placeholder="e.g. Vikram Sharma" style="width:100%;" required>
+            </div>
+            <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;">
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Role / Designation</label>
+                    <select id="staff-role-select" style="width:100%;">
+                        <option value="Head Chef">👨‍🍳 Head Chef</option>
+                        <option value="Station Chef">🍳 Station Chef</option>
+                        <option value="Floor Captain">🤵 Floor Captain</option>
+                        <option value="Waiter">🍽️ Waiter</option>
+                        <option value="Cashier / POS">💵 Cashier / POS</option>
+                        <option value="Shift Manager">🛡️ Shift Manager</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">4-Digit PIN *</label>
+                    <input type="text" id="staff-pin-input" inputmode="numeric" placeholder="1234" maxlength="4" pattern="\d{4}" style="width:100%;font-size:18px;letter-spacing:6px;font-weight:800;text-align:center;font-family:monospace;" required>
+                </div>
+            </div>
+            <div>
+                <label style="font-size:12.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:6px;">Contact Phone (Optional)</label>
+                <input type="text" id="staff-phone-input" placeholder="+91 98765 00000" style="width:100%;">
+            </div>
+            <div style="background:var(--bg-soft);padding:12px;border-radius:8px;border:1px solid var(--border-light);">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="staff-active-checkbox" checked style="width:18px;height:18px;accent-color:var(--primary);margin-top:2px;">
+                    <div>
+                        <div style="font-weight:700;font-size:13px;color:var(--text-primary);">Terminal Access Active</div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">Allow this staff member to unlock the Kitchen Display &amp; POS terminals with their 4-digit PIN.</div>
+                    </div>
+                </label>
+            </div>
+        </form>
+        <div style="padding:16px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:10px;">
+            <button class="btn-secondary" id="staff-modal-cancel-btn" onclick="window.adminApp.closeStaffModal()" style="cursor:pointer;">Cancel</button>
+            <button class="btn-primary" id="staff-save-btn" onclick="window.adminApp.saveStaffMember()" style="cursor:pointer;">Save Staff Member ✓</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL: RESTAURANT OWNER HANDOVER & SETUP WIZARD
+════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="handover-modal">
+    <div class="modal-card" style="max-width:560px;">
+        <div class="flex-between" style="padding:18px 22px;border-bottom:1px solid var(--border-light);background:#F0FDF4;">
+            <div>
+                <h3 style="font-size:17px;font-weight:800;color:#166534;">🚀 Restaurant Owner Handover Wizard</h3>
+                <p style="font-size:12px;color:#15803D;margin-top:2px;">Configure software for new client / restaurant handover</p>
+            </div>
+            <button class="btn-secondary" id="handover-modal-close-btn" onclick="window.adminApp.closeHandoverModal()" style="width:32px;height:32px;border-radius:50%;padding:0;cursor:pointer;">✕</button>
+        </div>
+
+        <div style="padding:22px;max-height:70vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px;">
+            <div style="font-size:12.5px;color:var(--text-secondary);background:var(--bg-soft);padding:12px;border-radius:8px;border-left:4px solid #16A34A;">
+                This wizard quickly tailors First Bite for a new restaurant owner. Fill in their details below to set up their brand, admin password, and fresh database.
+            </div>
+
+            <!-- Restaurant Profile -->
+            <div>
+                <h4 style="font-size:13.5px;font-weight:800;color:var(--text-primary);margin-bottom:10px;">1. Restaurant Branding</h4>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <div>
+                        <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Restaurant Name *</label>
+                        <input type="text" id="hw-name" placeholder="e.g. Bella Roma Italian Trattoria" style="width:100%;" required>
+                    </div>
+                    <div>
+                        <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Tagline</label>
+                        <input type="text" id="hw-tagline" placeholder="e.g. Authentic Wood-Fired Pizza &amp; Pasta" style="width:100%;">
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div>
+                            <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Contact Phone</label>
+                            <input type="text" id="hw-phone" placeholder="+91 98765 43210" style="width:100%;">
+                        </div>
+                        <div>
+                            <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Currency Symbol</label>
+                            <input type="text" id="hw-currency" value="₹" style="width:100%;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Restaurant Address</label>
+                        <input type="text" id="hw-address" placeholder="e.g. Shop 12, Food Street, High Street" style="width:100%;">
+                    </div>
+                    <div>
+                        <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">GST / Tax Rate (%)</label>
+                        <input type="number" id="hw-tax" value="5" step="0.5" style="width:100%;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Owner Master Credentials -->
+            <div style="border-top:1px solid var(--border-light);padding-top:14px;">
+                <h4 style="font-size:13.5px;font-weight:800;color:var(--text-primary);margin-bottom:10px;">2. New Owner Master Login</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div>
+                        <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">Owner Name</label>
+                        <input type="text" id="hw-owner-name" placeholder="e.g. Rajiv Kapoor" style="width:100%;">
+                    </div>
+                    <div>
+                        <label style="font-size:11.5px;font-weight:700;color:var(--text-secondary);display:block;margin-bottom:4px;">New Master Password *</label>
+                        <input type="text" id="hw-new-password" placeholder="e.g. OwnerPass2026!" style="width:100%;font-weight:700;" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Clean Options -->
+            <div style="border-top:1px solid var(--border-light);padding-top:14px;">
+                <h4 style="font-size:13.5px;font-weight:800;color:var(--text-primary);margin-bottom:10px;">3. Data Clean Slate Options</h4>
+                <div style="display:flex;flex-direction:column;gap:10px;background:var(--bg-soft);padding:14px;border-radius:10px;border:1px solid var(--border-light);">
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                        <input type="checkbox" id="hw-clear-orders" checked style="width:18px;height:18px;accent-color:var(--primary);margin-top:2px;">
+                        <div>
+                            <div style="font-weight:700;font-size:13px;color:var(--text-primary);">Clear Orders &amp; Sales History (Recommended)</div>
+                            <div style="font-size:11.5px;color:var(--text-secondary);">Start the new restaurant owner with 0 orders and ₹0 sales revenue.</div>
+                        </div>
+                    </label>
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                        <input type="checkbox" id="hw-wipe-catalog" style="width:18px;height:18px;accent-color:var(--primary);margin-top:2px;">
+                        <div>
+                            <div style="font-weight:700;font-size:13px;color:var(--text-primary);">Wipe Menu &amp; Categories to Blank Slate</div>
+                            <div style="font-size:11.5px;color:var(--text-secondary);">Check this if they want to enter all dishes themselves. Leave unchecked to keep sample items as helpful templates.</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div style="padding:16px 22px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;gap:10px;">
+            <button class="btn-secondary" id="handover-cancel-btn" onclick="window.adminApp.closeHandoverModal()" style="cursor:pointer;">Cancel</button>
+            <button class="btn-primary" id="execute-handover-btn" onclick="window.adminApp.executeHandover()" style="background:#16A34A;border-color:#16A34A;font-weight:800;padding:10px 24px;cursor:pointer;">
+                Complete Handover &amp; Save ✨
+            </button>
+        </div>
+    </div>
+</div>
+
 <script src="js/supabase-sdk.min.js"></script>
 <script>if(!window.supabase){document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>')}</script>
-<script src="js/sound-effects.js"></script>
-<script src="js/supabase-client.js"></script>
-<script src="js/common.js"></script>
-<script src="js/admin.js"></script>
+<script src="js/sound-effects.js?v=3.0"></script>
+<script src="js/supabase-client.js?v=3.0"></script>
+<script src="js/common.js?v=3.0"></script>
+<script src="js/admin.js?v=3.0"></script>
 </body>
 </html>

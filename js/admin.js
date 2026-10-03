@@ -3,6 +3,16 @@
 // Image Upload, Category CRUD, Date-Range Analytics, Menu CRUD
 // ==========================================================
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 class AdminApp {
     constructor() {
         this.store = window.firstBiteStore;
@@ -28,16 +38,21 @@ class AdminApp {
         // Coupon editing
         this.editingCouponId = null;
 
+        // Deduplication set for alerts
+        this.alertedOrders = new Set();
+
         this.init();
     }
 
     init() {
+        this.checkAdminAuth();
         this.renderRestaurantInfo();
         this.renderDashboard();
         this.renderOrdersTable();
         this.renderMenuTable();
         this.renderCategoriesList();
         this.renderCouponsList();
+        this.renderStaffList();
         this.renderSettingsForm();
         this.setupEventListeners();
         this.setupRealtimeListeners();
@@ -171,9 +186,10 @@ class AdminApp {
 
     renderSalesChart(orders) {
         const canvas = document.getElementById('sales-canvas');
-        if (!canvas) return;
+        if (!canvas || typeof canvas.getContext !== 'function') return;
         const ctx    = canvas.getContext('2d');
-        const width  = canvas.width  = canvas.parentElement.clientWidth || 600;
+        if (!ctx) return;
+        const width  = canvas.width  = (canvas.parentElement && canvas.parentElement.clientWidth) || 600;
         const height = canvas.height = 220;
 
         ctx.clearRect(0, 0, width, height);
@@ -452,7 +468,13 @@ class AdminApp {
 
         const menu       = this.store.getMenuItems();
         const categories = this.store.getCategories();
-        const catMap     = Object.fromEntries(categories.map(c => [c.id, `${c.icon} ${c.name}`]));
+        const catMap     = {};
+        categories.forEach(c => {
+            const label = `${c.icon || '🍽️'} ${c.name}`;
+            if (c.id) catMap[c.id] = label;
+            if (c.cloud_id) catMap[c.cloud_id] = label;
+            if (c.name) catMap[c.name.trim().toLowerCase()] = label;
+        });
         const currency   = this.store.getRestaurant().currency || '₹';
 
         const filtered = menu.filter(item => {
@@ -472,6 +494,8 @@ class AdminApp {
                 ? item.image_url
                 : (item.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=80&q=60');
 
+            const itemCatLabel = catMap[item.category_id] || (item.category_id && catMap[item.category_id.toLowerCase()]) || 'General';
+
             return `
             <tr>
                 <td>
@@ -487,7 +511,7 @@ class AdminApp {
                 </td>
                 <td>
                     <span class="diet-icon ${item.is_veg ? 'veg' : 'non-veg'}"></span>
-                    <span style="font-size:12px;margin-left:4px;">${catMap[item.category_id] || 'General'}</span>
+                    <span style="font-size:12px;margin-left:4px;font-weight:600;">${itemCatLabel}</span>
                 </td>
                 <td><b>${formatCurrency(item.price, currency)}</b></td>
                 <td>
@@ -581,7 +605,9 @@ class AdminApp {
         if (fileArea) fileArea.style.display = 'none';
         if (urlArea)  urlArea.style.display  = 'block';
 
-        this._populateCategoriesDropdown('');
+        const categories = this.store.getCategories();
+        const firstCatId = categories.length > 0 ? categories[0].id : '';
+        this._populateCategoriesDropdown(firstCatId);
         this._setupImageUploader();
         document.getElementById('dish-modal').classList.add('active');
     }
@@ -594,7 +620,13 @@ class AdminApp {
         this.uploadedImageB64 = null;
 
         document.getElementById('dish-modal-title').textContent = 'Edit Menu Item';
-        this._populateCategoriesDropdown(item.category_id);
+        
+        // Find matching category ID from item
+        const categories = this.store.getCategories();
+        const matchedCat = categories.find(c => c.id === item.category_id || c.cloud_id === item.category_id || (c.name && item.category_id && c.name.toLowerCase() === item.category_id.toLowerCase()));
+        const selectedCatId = matchedCat ? matchedCat.id : (item.category_id || (categories[0] ? categories[0].id : ''));
+        
+        this._populateCategoriesDropdown(selectedCatId);
 
         document.getElementById('dish-name').value      = item.name;
         document.getElementById('dish-price').value     = item.price;
@@ -603,6 +635,8 @@ class AdminApp {
         document.getElementById('dish-prep').value      = item.prep_time  || '15 min';
         document.getElementById('dish-calories').value  = item.calories   || '';
         document.getElementById('dish-badge').value     = item.badge      || '';
+        const selectEl = document.getElementById('dish-category');
+        if (selectEl) selectEl.value = selectedCatId;
 
         const vegRadio = document.querySelector(`input[name="dish_veg"][value="${item.is_veg ? 'true' : 'false'}"]`);
         if (vegRadio) vegRadio.checked = true;
@@ -634,9 +668,18 @@ class AdminApp {
         const select = document.getElementById('dish-category');
         if (!select) return;
         const categories = this.store.getCategories();
+        if (!categories.length) {
+            select.innerHTML = '<option value="">No categories available</option>';
+            return;
+        }
+
+        const matched = categories.find(c => c.id === selectedId || c.cloud_id === selectedId || (c.name && selectedId && c.name.toLowerCase() === selectedId.toLowerCase()));
+        const activeId = matched ? matched.id : (selectedId || categories[0].id);
+
         select.innerHTML = categories.map(c =>
-            `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${c.icon} ${c.name}</option>`
+            `<option value="${c.id}" ${c.id === activeId ? 'selected' : ''}>${c.icon || '🍽️'} ${c.name}</option>`
         ).join('');
+        select.value = activeId;
     }
 
     saveDish() {
@@ -825,6 +868,7 @@ class AdminApp {
 
     switchView(viewId) {
         this.currentView = viewId;
+        if (window.sounds) window.sounds.playClick();
 
         document.querySelectorAll('.sidebar-link').forEach(link =>
             link.classList.toggle('active', link.dataset.view === viewId)
@@ -833,30 +877,50 @@ class AdminApp {
             view.classList.toggle('active', view.id === `view-${viewId}`)
         );
 
-        if (viewId === 'dashboard') this.renderDashboard();
+        if (viewId === 'dashboard')       this.renderDashboard();
         else if (viewId === 'orders')     this.renderOrdersTable();
         else if (viewId === 'menu')       this.renderMenuTable();
         else if (viewId === 'categories') this.renderCategoriesList();
         else if (viewId === 'coupons')    this.renderCouponsList();
         else if (viewId === 'qrcodes')    this.renderQrCodesView();
+        else if (viewId === 'staff')      this.renderStaffList();
+        else if (viewId === 'settings')   this.renderSettingsForm();
+    }
+
+    getQrBaseUrl() {
+        let saved = localStorage.getItem('fb_qr_base_domain');
+        if (saved && saved.trim()) {
+            return saved.trim().replace(/\/+$/, '');
+        }
+        const loc = window.location;
+        if (loc.protocol === 'file:') {
+            return 'http://localhost:8080';
+        }
+        const path = loc.pathname.substring(0, loc.pathname.lastIndexOf('/') + 1);
+        return (loc.origin + path).replace(/\/+$/, '');
     }
 
     renderQrCodesView() {
+        const domainInput = document.getElementById('qr-domain-input');
+        if (domainInput) {
+            domainInput.value = this.getQrBaseUrl();
+        }
         const sel = document.getElementById('qr-table-select');
         const tableNum = sel ? sel.value : '4';
         this.updateTableQrCode(tableNum);
     }
 
     updateTableQrCode(tableNum) {
-        const url = `customer.html?table=${tableNum}`;
+        const baseUrl = this.getQrBaseUrl();
+        const fullUrl = `${baseUrl}/index.html?table=${encodeURIComponent(tableNum)}`;
         const urlEl = document.getElementById('qr-link-url');
         const testBtn = document.getElementById('qr-test-btn');
         const imgEl = document.getElementById('qr-preview-img');
         const titleEl = document.getElementById('qr-preview-tablename');
 
-        if (urlEl) urlEl.textContent = url;
-        if (testBtn) testBtn.href = url;
-        if (imgEl) imgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+        if (urlEl) urlEl.textContent = fullUrl;
+        if (testBtn) testBtn.href = fullUrl;
+        if (imgEl) imgEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(fullUrl)}`;
         if (titleEl) titleEl.textContent = `🍽️ Table ${tableNum}`;
     }
 
@@ -865,13 +929,7 @@ class AdminApp {
     // ═══════════════════════════════════════════════════════════
 
     setupEventListeners() {
-        // Sidebar nav
-        document.querySelectorAll('.sidebar-link').forEach(link => {
-            link.addEventListener('click', () => {
-                if (window.sounds) window.sounds.playClick();
-                this.switchView(link.dataset.view);
-            });
-        });
+        // Sidebar nav is handled via inline onclick in HTML (calls switchView directly)
 
         // ── Analytics date range picker ──────────────────────
         document.getElementById('analytics-range-select')?.addEventListener('change', e => {
@@ -942,21 +1000,111 @@ class AdminApp {
             this.updateTableQrCode(e.target.value);
         });
 
+        document.getElementById('qr-save-domain-btn')?.addEventListener('click', () => {
+            const input = document.getElementById('qr-domain-input');
+            let val = input ? input.value.trim() : '';
+            if (val) {
+                if (!val.startsWith('http://') && !val.startsWith('https://')) {
+                    val = 'https://' + val;
+                }
+                val = val.replace(/\/+$/, '');
+                localStorage.setItem('fb_qr_base_domain', val);
+                if (input) input.value = val;
+                showToast(`Permanent domain saved: ${val} ✓`, 'success');
+            } else {
+                localStorage.removeItem('fb_qr_base_domain');
+                if (input) input.value = this.getQrBaseUrl();
+                showToast('Reset to default auto-detected domain', 'info');
+            }
+            const sel = document.getElementById('qr-table-select');
+            this.updateTableQrCode(sel ? sel.value : '4');
+        });
+
+        document.getElementById('qr-reset-domain-btn')?.addEventListener('click', () => {
+            localStorage.removeItem('fb_qr_base_domain');
+            const domainInput = document.getElementById('qr-domain-input');
+            if (domainInput) domainInput.value = this.getQrBaseUrl();
+            const sel = document.getElementById('qr-table-select');
+            this.updateTableQrCode(sel ? sel.value : '4');
+            showToast('Domain reset to current browser URL ✓', 'info');
+        });
+
+        document.getElementById('qr-copy-url-btn')?.addEventListener('click', () => {
+            const sel = document.getElementById('qr-table-select');
+            const tableNum = sel ? sel.value : '4';
+            const fullUrl = `${this.getQrBaseUrl()}/index.html?table=${encodeURIComponent(tableNum)}`;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(fullUrl).then(() => {
+                    showToast(`Copied Table ${tableNum} URL to clipboard! 📋`, 'success');
+                }).catch(() => {
+                    showToast(fullUrl, 'info', 6000);
+                });
+            } else {
+                showToast(fullUrl, 'info', 6000);
+            }
+        });
+
+        document.getElementById('qr-download-btn')?.addEventListener('click', () => {
+            const sel = document.getElementById('qr-table-select');
+            const tableNum = sel ? sel.value : '4';
+            const fullUrl = `${this.getQrBaseUrl()}/index.html?table=${encodeURIComponent(tableNum)}`;
+            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(fullUrl)}`;
+            const link = document.createElement('a');
+            link.href = qrApiUrl;
+            link.target = '_blank';
+            link.download = `table-${tableNum}-qr.png`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            showToast(`Downloading Table ${tableNum} QR Code Image ⬇️`, 'success');
+        });
+
         document.getElementById('qr-print-btn')?.addEventListener('click', () => {
             window.print();
         });
 
         // ── Settings ─────────────────────────────────────────
         document.getElementById('save-settings-btn')?.addEventListener('click', () => this.saveSettings());
+        document.getElementById('reset-orders-btn')?.addEventListener('click',  () => this.clearAllOrders());
+        document.getElementById('reset-demo-btn')?.addEventListener('click',    () => this.factoryResetDemo());
+        document.getElementById('wipe-catalog-btn')?.addEventListener('click',  () => this.wipeCatalog());
+
+        // ── Admin Login & Security ───────────────────────────
+        // Form submit covers Enter key press (inline onclick on button covers click)
+        document.getElementById('admin-login-form')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleAdminLogin();
+        });
+        // change-admin-pass-btn does not have inline onclick so keep its listener
+        document.getElementById('change-admin-pass-btn')?.addEventListener('click', () => this.handleChangeMasterPassword());
+
+        // ── Staff Management ─────────────────────────────────
+        // Buttons have inline onclick in HTML; only keep listeners for ones without inline onclick
+        // (launch-handover-wizard-btn, handover-modal-close-btn, handover-cancel-btn, execute-handover-btn)
+
+        // ── Handover Wizard ───────────────────────────────────
+        document.getElementById('launch-handover-wizard-btn')?.addEventListener('click', () => this.openHandoverWizard());
+        document.getElementById('handover-modal-close-btn')?.addEventListener('click', () => this.closeHandoverModal());
+        document.getElementById('handover-cancel-btn')?.addEventListener('click', () => this.closeHandoverModal());
+        document.getElementById('execute-handover-btn')?.addEventListener('click', () => this.executeHandover());
     }
 
     setupRealtimeListeners() {
         this.store.subscribe('ORDER_CREATED', (event) => {
             this.renderDashboard();
             this.renderOrdersTable();
-            if (event && event.order) {
-                showToast(`🔔 New Order placed: ${event.order.order_number}`, 'warning');
+            const order = event && event.order;
+            const orderKey = order ? (order.order_number || order.id) : null;
+            if (orderKey) {
+                if (this.alertedOrders.has(orderKey)) return;
+                this.alertedOrders.add(orderKey);
+                showToast(`🔔 New Order placed: ${order.order_number}`, 'warning');
             }
+        });
+
+        this.store.subscribe('ORDER_SYNCED', () => {
+            this.renderDashboard();
+            this.renderOrdersTable();
         });
 
         this.store.subscribe('ORDER_STATUS_CHANGED', () => {
@@ -972,6 +1120,11 @@ class AdminApp {
         this.store.subscribe('DATA_REFRESH', () => {
             this.renderDashboard();
             this.renderOrdersTable();
+            this.renderMenuTable();
+            this.renderCategoriesList();
+            this.renderCouponsList();
+            this.renderStaffList();
+            this.renderRestaurantInfo();
         });
 
         this.store.subscribe('REALTIME_CONNECTED', () => {
@@ -979,11 +1132,19 @@ class AdminApp {
                 this.store.syncAllFromSupabase().then(() => {
                     this.renderDashboard();
                     this.renderOrdersTable();
+                    this.renderMenuTable();
+                    this.renderCategoriesList();
+                    this.renderStaffList();
                 });
             }
         });
 
         this.store.subscribe('MENU_UPDATED', () => {
+            this.renderMenuTable();
+        });
+
+        this.store.subscribe('CATEGORY_UPDATED', () => {
+            this.renderCategoriesList();
             this.renderMenuTable();
         });
 
@@ -994,8 +1155,48 @@ class AdminApp {
         this.store.subscribe('COUPONS_UPDATED', () => {
             this.renderCouponsList();
         });
+
+        this.store.subscribe('STAFF_UPDATED', () => {
+            this.renderStaffList();
+        });
+
+        this.store.subscribe('ADMIN_AUTH_UPDATED', () => {
+            this.checkAdminAuth();
+        });
+
+        this.store.subscribe('ADMIN_SESSION_CHANGED', () => {
+            this.checkAdminAuth();
+        });
     }
 }
+
+AdminApp.prototype.clearAllOrders = function() {
+    if (!confirm('⚠️ Are you sure you want to clear ALL orders and sales history? This action cannot be undone.')) return;
+    this.store.clearAllOrders();
+    this.renderDashboard();
+    this.renderOrdersTable();
+    showToast('All orders & sales cleared! ✓', 'info');
+};
+
+AdminApp.prototype.factoryResetDemo = function() {
+    if (!confirm('🔄 Restore full sample catalog? This will reset all demo dishes, categories, coupons and clear orders.')) return;
+    this.store.resetDemoData();
+    this.renderDashboard();
+    this.renderOrdersTable();
+    this.renderMenuTable();
+    this.renderCategoriesList();
+    this.renderCouponsList();
+    this.renderRestaurantInfo();
+    showToast('Factory demo data restored! ✓', 'success');
+};
+
+AdminApp.prototype.wipeCatalog = function() {
+    if (!confirm('✨ Wipe entire catalog? All menu items and categories will be cleared so you can build from a clean slate for a new restaurant client.')) return;
+    this.store.wipeCatalog();
+    this.renderMenuTable();
+    this.renderCategoriesList();
+    showToast('Catalog wiped! Clean slate ready for new client ✓', 'warning');
+};
 
 // ═══════════════════════════════════════════════════════════
 // COUPON MANAGEMENT
@@ -1013,29 +1214,51 @@ AdminApp.prototype.renderCouponsList = function() {
         return;
     }
 
-    container.innerHTML = coupons.map(c => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border:1px solid ${c.is_active ? '#6EE7B7' : 'var(--border-light)'};border-radius:12px;margin-bottom:10px;background:${c.is_active ? '#F0FDF9' : 'var(--bg-soft)'}">
-            <div style="display:flex;align-items:center;gap:14px;">
+    container.innerHTML = coupons.map(c => {
+        const isPct = c.discount_type === 'percentage' || c.discount_type === 'percent';
+        const discountLabel = isPct ? `${c.discount_value}% OFF` : `${currency}${c.discount_value} OFF`;
+        const minAmt = Number(c.min_order_amount ?? c.min_order_value) || 0;
+        const maxCap = Number(c.max_discount) || 0;
+        const isExpired = c.expires_at && new Date(c.expires_at) < new Date();
+        const isActive = c.is_active !== false;
+        const isVisible = c.is_visible !== false;
+
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border:1px solid ${isActive && !isExpired ? '#6EE7B7' : 'var(--border-light)'};border-radius:12px;margin-bottom:10px;background:${isActive && !isExpired ? '#F0FDF9' : 'var(--bg-soft)'};flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:14px;min-width:260px;">
                 <div style="font-size:28px;">🎟️</div>
                 <div>
-                    <div style="font-weight:800;font-size:16px;font-family:monospace;letter-spacing:1px;color:var(--text-primary);">${c.code}</div>
-                    <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">
-                        ${c.discount_type === 'percent' ? c.discount_value + '% OFF' : currency + c.discount_value + ' OFF'}
-                        ${c.min_order_value > 0 ? ' • Min: ' + formatCurrency(c.min_order_value, currency) : ''}
-                        ${c.expires_at ? ' • Exp: ' + new Date(c.expires_at).toLocaleDateString() : ' • No expiry'}
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-weight:800;font-size:16px;font-family:monospace;letter-spacing:1px;color:var(--text-primary);">${c.code}</span>
+                        ${isExpired ? `<span style="font-size:10.5px;background:#FEE2E2;color:#DC2626;padding:2px 7px;border-radius:10px;font-weight:700;">EXPIRED</span>` : ''}
+                        ${isActive ? `<span style="font-size:10.5px;background:#DCFCE7;color:#15803D;padding:2px 7px;border-radius:10px;font-weight:700;">🟢 Active</span>` : `<span style="font-size:10.5px;background:#F3F4F6;color:#6B7280;padding:2px 7px;border-radius:10px;font-weight:700;">⚪ Inactive</span>`}
+                        ${isVisible ? `<span style="font-size:10.5px;background:#E0F2FE;color:#0369A1;padding:2px 7px;border-radius:10px;font-weight:700;">👁️ Public</span>` : `<span style="font-size:10.5px;background:#FEF3C7;color:#B45309;padding:2px 7px;border-radius:10px;font-weight:700;" title="Hidden from customer cart menu; redeemable when typed manually">🔒 Secret / Hidden</span>`}
+                        ${c.usage_count > 0 ? `<span style="font-size:11px;color:var(--text-secondary);background:var(--bg-card);padding:2px 7px;border-radius:10px;border:1px solid var(--border-light);">Used ${c.usage_count}x</span>` : ''}
+                    </div>
+                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+                        <span style="font-weight:700;color:var(--primary);">${discountLabel}</span>
+                        ${maxCap > 0 ? ` (up to ${currency}${maxCap})` : ''}
+                        ${minAmt > 0 ? ` • Min: ${formatCurrency(minAmt, currency)}` : ' • No min order'}
+                        ${c.expires_at ? ' • Exp: ' + new Date(c.expires_at).toLocaleDateString() : ' • Never expires'}
                     </div>
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
-                <label class="stock-toggle-switch" title="${c.is_active ? 'Disable' : 'Enable'}">
-                    <input type="checkbox" ${c.is_active ? 'checked' : ''} onchange="window.adminApp.toggleCoupon('${c.id}', this.checked)">
+                <button type="button" class="table-action-btn" style="background:${isVisible ? 'var(--bg-card)' : '#FEF3C7'};color:${isVisible ? 'var(--text-secondary)' : '#B45309'};font-weight:700;border:1px solid ${isVisible ? 'var(--border-light)' : '#FCD34D'};" 
+                    title="${isVisible ? 'Click to hide from customer promo chips (make secret)' : 'Click to make publicly visible in customer cart'}" 
+                    onclick="window.adminApp.toggleCouponVisibility('${c.id}', ${!isVisible})">
+                    ${isVisible ? '👁️ Public' : '🔒 Hidden'}
+                </button>
+                <label class="stock-toggle-switch" title="${isActive ? 'Click to deactivate coupon completely' : 'Click to activate coupon'}">
+                    <input type="checkbox" ${isActive ? 'checked' : ''} onchange="window.adminApp.toggleCoupon('${c.id}', this.checked)">
                     <span class="slider-round"></span>
                 </label>
                 <button class="table-action-btn" onclick="window.adminApp.openEditCouponModal('${c.id}')">✏️ Edit</button>
                 <button class="table-action-btn" style="color:#DC2626;" onclick="window.adminApp.deleteCoupon('${c.id}')">🗑️</button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 };
 
 AdminApp.prototype.openCouponModal = function(couponId) {
@@ -1044,15 +1267,17 @@ AdminApp.prototype.openCouponModal = function(couponId) {
     if (title) title.textContent = couponId ? '✏️ Edit Coupon' : '🎟️ New Coupon';
 
     if (couponId) {
-        const c = (this.store.getCoupons ? this.store.getCoupons() : []).find(x => x.id === couponId);
+        const c = (this.store.getCoupons ? this.store.getCoupons() : []).find(x => x.id === couponId || x.code === couponId);
         if (c) {
-            document.getElementById('coupon-code-input').value = c.code;
-            document.getElementById('coupon-type-select').value = c.discount_type;
-            document.getElementById('coupon-value-input').value = c.discount_value;
-            document.getElementById('coupon-min-order-input').value = c.min_order_value || 0;
+            document.getElementById('coupon-code-input').value = c.code || '';
+            const isPct = c.discount_type === 'percentage' || c.discount_type === 'percent';
+            document.getElementById('coupon-type-select').value = isPct ? 'percent' : 'flat';
+            document.getElementById('coupon-value-input').value = c.discount_value || '';
+            document.getElementById('coupon-min-order-input').value = c.min_order_amount ?? c.min_order_value ?? 0;
             document.getElementById('coupon-max-discount-input').value = c.max_discount || 0;
             document.getElementById('coupon-expiry-input').value = c.expires_at ? c.expires_at.split('T')[0] : '';
-            document.getElementById('coupon-active-toggle').checked = c.is_active;
+            document.getElementById('coupon-active-toggle').checked = c.is_active !== false;
+            document.getElementById('coupon-visible-toggle').checked = c.is_visible !== false;
         }
     } else {
         document.getElementById('coupon-code-input').value = '';
@@ -1062,6 +1287,7 @@ AdminApp.prototype.openCouponModal = function(couponId) {
         document.getElementById('coupon-max-discount-input').value = 0;
         document.getElementById('coupon-expiry-input').value = '';
         document.getElementById('coupon-active-toggle').checked = true;
+        document.getElementById('coupon-visible-toggle').checked = true;
     }
 
     document.getElementById('coupon-modal').classList.add('active');
@@ -1078,25 +1304,29 @@ AdminApp.prototype.closeCouponModal = function() {
 
 AdminApp.prototype.saveCoupon = function() {
     const code = document.getElementById('coupon-code-input')?.value?.trim().toUpperCase();
-    const type = document.getElementById('coupon-type-select')?.value;
+    const type = document.getElementById('coupon-type-select')?.value; // 'percent' or 'flat'
     const value = Number(document.getElementById('coupon-value-input')?.value);
     const minOrder = Number(document.getElementById('coupon-min-order-input')?.value) || 0;
     const maxDiscount = Number(document.getElementById('coupon-max-discount-input')?.value) || 0;
     const expiryStr = document.getElementById('coupon-expiry-input')?.value;
-    const isActive = document.getElementById('coupon-active-toggle')?.checked;
+    const isActive = document.getElementById('coupon-active-toggle')?.checked !== false;
+    const isVisible = document.getElementById('coupon-visible-toggle')?.checked !== false;
 
     if (!code) { showToast('Please enter a coupon code', 'warning'); return; }
     if (!value || value <= 0) { showToast('Please enter a valid discount value', 'warning'); return; }
 
+    const isPct = type === 'percent' || type === 'percentage';
     const couponData = {
-        id: this.editingCouponId || `coupons_${Date.now()}`,
+        id: this.editingCouponId || `cpn-${Date.now()}`,
         code,
-        discount_type: type,
+        discount_type: isPct ? 'percentage' : 'fixed',
         discount_value: value,
+        min_order_amount: minOrder,
         min_order_value: minOrder,
-        max_discount: maxDiscount,
+        max_discount: maxDiscount > 0 ? maxDiscount : null,
         expires_at: expiryStr ? expiryStr + 'T23:59:59' : null,
         is_active: isActive,
+        is_visible: isVisible,
         created_at: new Date().toISOString()
     };
 
@@ -1112,11 +1342,408 @@ AdminApp.prototype.toggleCoupon = function(couponId, isActive) {
     showToast(`Coupon ${isActive ? 'activated' : 'deactivated'}`, 'info');
 };
 
+AdminApp.prototype.toggleCouponVisibility = function(couponId, isVisible) {
+    if (this.store.toggleCouponVisibility) this.store.toggleCouponVisibility(couponId, isVisible);
+    this.renderCouponsList();
+    showToast(`Coupon is now ${isVisible ? 'publicly visible' : 'hidden (secret code)'}`, 'info');
+};
+
 AdminApp.prototype.deleteCoupon = function(couponId) {
     if (!confirm('Delete this coupon?')) return;
     if (this.store.deleteCoupon) this.store.deleteCoupon(couponId);
     this.renderCouponsList();
     showToast('Coupon deleted', 'info');
+};
+
+// ══════════════════════════════════════════════════════════════
+// ADMIN AUTHENTICATION & ACCESS CONTROL
+// ══════════════════════════════════════════════════════════════
+
+AdminApp.prototype.checkAdminAuth = function() {
+    const overlay = document.getElementById('admin-login-overlay');
+    const badge = document.getElementById('admin-user-badge');
+    const auth = this.store.getAdminAuth();
+
+    if (badge) {
+        badge.textContent = auth.ownerName || 'Admin';
+    }
+
+    if (this.store.isAdminLoggedIn()) {
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.style.display = 'none';
+        }
+    } else {
+        if (overlay) {
+            overlay.style.display = 'flex';
+            overlay.classList.add('active');
+            const passInput = document.getElementById('admin-login-password');
+            if (passInput) setTimeout(() => passInput.focus(), 100);
+        }
+    }
+};
+
+AdminApp.prototype.handleAdminLogin = function() {
+    const userEl = document.getElementById('admin-login-username');
+    const passEl = document.getElementById('admin-login-password');
+    const errEl = document.getElementById('admin-login-error');
+
+    const username = userEl ? userEl.value.trim() : '';
+    const password = passEl ? passEl.value : '';
+
+    const res = this.store.loginAdmin(username, password);
+    if (res.success) {
+        if (errEl) errEl.style.display = 'none';
+        if (passEl) passEl.value = '';
+        this.checkAdminAuth();
+        showToast('Welcome to First Bite Operations Dashboard! 🛡️', 'success');
+    } else {
+        if (errEl) {
+            errEl.textContent = res.error || 'Invalid credentials';
+            errEl.style.display = 'block';
+        }
+    }
+};
+
+AdminApp.prototype.handleAdminLogout = function() {
+    if (!confirm('Sign out of Admin Operations?')) return;
+    this.store.logoutAdmin();
+    this.checkAdminAuth();
+    showToast('Signed out successfully', 'info');
+};
+
+AdminApp.prototype.handleChangeMasterPassword = function() {
+    const curEl = document.getElementById('admin-current-pass');
+    const newEl = document.getElementById('admin-new-pass');
+    const curPass = curEl ? curEl.value : '';
+    const newPass = newEl ? newEl.value : '';
+
+    if (!curPass || !newPass) {
+        showToast('Please fill in both current and new password', 'warning');
+        return;
+    }
+
+    const res = this.store.changeMasterPassword(curPass, newPass);
+    if (res.success) {
+        if (curEl) curEl.value = '';
+        if (newEl) newEl.value = '';
+        showToast('Master password successfully updated! 🔒', 'success');
+    } else {
+        showToast(res.error || 'Failed to update password', 'error');
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
+// STAFF ROSTER & TERMINAL ACCESS (CRUD)
+// ══════════════════════════════════════════════════════════════
+
+AdminApp.prototype.renderStaffList = function() {
+    const staff = this.store.getStaffMembers();
+
+    // Stats
+    const totalEl    = document.getElementById('staff-stat-total');
+    const chefsEl    = document.getElementById('staff-stat-chefs');
+    const waitersEl  = document.getElementById('staff-stat-waiters');
+    const cashiersEl = document.getElementById('staff-stat-cashiers');
+
+    if (totalEl) totalEl.textContent = staff.length;
+    if (chefsEl) chefsEl.textContent = staff.filter(s => s.role && s.role.toLowerCase().includes('chef')).length;
+    if (waitersEl) waitersEl.textContent = staff.filter(s => s.role && (s.role.toLowerCase().includes('waiter') || s.role.toLowerCase().includes('captain'))).length;
+    if (cashiersEl) cashiersEl.textContent = staff.filter(s => s.role && (s.role.toLowerCase().includes('cashier') || s.role.toLowerCase().includes('pos'))).length;
+
+    const tbody = document.getElementById('staff-table-body');
+    if (!tbody) return;
+
+    if (staff.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">No staff members found. Click "+ Add Staff Member" to add kitchen chefs or floor captains.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = staff.map(s => {
+        let roleIcon = '👤';
+        const rLower = (s.role || '').toLowerCase();
+        if (rLower.includes('chef')) roleIcon = '👨‍🍳';
+        else if (rLower.includes('waiter') || rLower.includes('captain')) roleIcon = '🤵';
+        else if (rLower.includes('cashier') || rLower.includes('pos')) roleIcon = '💵';
+        else if (rLower.includes('manager')) roleIcon = '🛡️';
+
+        const statusPill = s.active !== false
+            ? `<span style="background:#ECFDF5;color:#065F46;border:1px solid #A7F3D0;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:700;">● Active</span>`
+            : `<span style="background:#F1F5F9;color:#64748B;border:1px solid #CBD5E1;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:700;">○ Inactive</span>`;
+
+        return `
+            <tr>
+                <td>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="width:34px;height:34px;border-radius:50%;background:var(--bg-soft);border:1px solid var(--border-light);display:flex;align-items:center;justify-content:center;font-size:16px;">
+                            ${roleIcon}
+                        </div>
+                        <div>
+                            <div style="font-weight:700;color:var(--text-primary);font-size:13.5px;">${escapeHtml(s.name)}</div>
+                            <div style="font-size:11px;color:var(--text-muted);">${s.id}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span style="background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:700;">
+                        ${escapeHtml(s.role || 'Staff')}
+                    </span>
+                </td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span id="pin-val-${s.id}" style="font-family:monospace;letter-spacing:3px;font-size:14px;font-weight:800;background:var(--bg-soft);border:1px solid var(--border-light);padding:2px 8px;border-radius:6px;min-width:54px;text-align:center;">••••</span>
+                        <button type="button" class="btn-secondary" style="padding:2px 7px;font-size:11px;border-radius:6px;" onclick="window.adminApp.togglePinVisibility('${s.id}', '${s.pin}')" title="Show/Hide PIN">👁️</button>
+                    </div>
+                </td>
+                <td style="font-size:12.5px;color:var(--text-secondary);">
+                    ${escapeHtml(s.phone || '—')}
+                </td>
+                <td>
+                    ${statusPill}
+                </td>
+                <td style="text-align:right;">
+                    <div style="display:inline-flex;gap:6px;">
+                        <button type="button" class="btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="window.adminApp.openStaffModal('${s.id}')">✏️ Edit</button>
+                        <button type="button" class="btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="window.adminApp.toggleStaffStatus('${s.id}')">${s.active !== false ? 'Deactivate' : 'Activate'}</button>
+                        <button type="button" class="btn-secondary" style="padding:4px 10px;font-size:12px;color:#DC2626;border-color:#FCA5A5;" onclick="window.adminApp.deleteStaffMember('${s.id}')">🗑️</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+AdminApp.prototype.openStaffModal = function(id = null) {
+    this.editingStaffId = id;
+    const titleEl = document.getElementById('staff-modal-title');
+    const nameEl  = document.getElementById('staff-name-input');
+    const roleEl  = document.getElementById('staff-role-select');
+    const pinEl   = document.getElementById('staff-pin-input');
+    const phoneEl = document.getElementById('staff-phone-input');
+    const actEl   = document.getElementById('staff-active-checkbox');
+
+    if (id) {
+        if (titleEl) titleEl.textContent = 'Edit Staff Member';
+        const staffList = this.store.getStaffMembers();
+        const member = staffList.find(s => s.id === id);
+        if (member) {
+            if (nameEl)  nameEl.value = member.name || '';
+            if (roleEl)  roleEl.value = member.role || 'Head Chef';
+            if (pinEl)   pinEl.value = member.pin || '';
+            if (phoneEl) phoneEl.value = member.phone || '';
+            if (actEl)   actEl.checked = member.active !== false;
+        }
+    } else {
+        if (titleEl) titleEl.textContent = 'Add Staff Member';
+        if (nameEl)  nameEl.value = '';
+        if (roleEl)  roleEl.value = 'Head Chef';
+        if (pinEl)   pinEl.value = '';
+        if (phoneEl) phoneEl.value = '';
+        if (actEl)   actEl.checked = true;
+    }
+
+    const modal = document.getElementById('staff-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    }
+    if (nameEl) setTimeout(() => nameEl.focus(), 100);
+};
+
+AdminApp.prototype.closeStaffModal = function() {
+    const modal = document.getElementById('staff-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+    this.editingStaffId = null;
+};
+
+AdminApp.prototype.saveStaffMember = function() {
+    const nameEl  = document.getElementById('staff-name-input');
+    const roleEl  = document.getElementById('staff-role-select');
+    const pinEl   = document.getElementById('staff-pin-input');
+    const phoneEl = document.getElementById('staff-phone-input');
+    const actEl   = document.getElementById('staff-active-checkbox');
+
+    const name  = nameEl ? nameEl.value.trim() : '';
+    const role  = roleEl ? roleEl.value : 'Head Chef';
+    const pin   = pinEl ? pinEl.value.trim() : '';
+    const phone = phoneEl ? phoneEl.value.trim() : '';
+    const active = actEl ? actEl.checked : true;
+
+    if (!name) {
+        showToast('Please enter staff name', 'warning');
+        if (nameEl) nameEl.focus();
+        return;
+    }
+
+    if (!/^\d{4}$/.test(pin)) {
+        showToast('PIN must be exactly 4 digits (e.g. 1234)', 'warning');
+        if (pinEl) pinEl.focus();
+        return;
+    }
+
+    try {
+        this.store.saveStaffMember({
+            id: this.editingStaffId,
+            name,
+            role,
+            pin,
+            phone,
+            active
+        });
+        this.closeStaffModal();
+        this.renderStaffList();
+        showToast(`Staff member "${name}" saved successfully ✓`, 'success');
+    } catch(err) {
+        showToast(err.message || 'Error saving staff member', 'error');
+    }
+};
+
+AdminApp.prototype.toggleStaffStatus = function(id) {
+    const list = this.store.getStaffMembers();
+    const member = list.find(s => s.id === id);
+    if (!member) return;
+
+    member.active = !member.active;
+    try {
+        this.store.saveStaffMember(member);
+        this.renderStaffList();
+        showToast(`Staff member ${member.active ? 'activated' : 'deactivated'}`, 'info');
+    } catch(err) {
+        showToast(err.message, 'error');
+    }
+};
+
+AdminApp.prototype.deleteStaffMember = function(id) {
+    const list = this.store.getStaffMembers();
+    const member = list.find(s => s.id === id);
+    const name = member ? member.name : 'this staff member';
+
+    if (!confirm(`Are you sure you want to remove ${name}?`)) return;
+
+    try {
+        this.store.deleteStaffMember(id);
+        this.renderStaffList();
+        showToast(`Staff member "${name}" removed`, 'info');
+    } catch (err) {
+        showToast(err.message, 'warning');
+    }
+};
+
+AdminApp.prototype.togglePinVisibility = function(id, pin) {
+    const el = document.getElementById(`pin-val-${id}`);
+    if (!el) return;
+    if (el.textContent === '••••') {
+        el.textContent = pin;
+    } else {
+        el.textContent = '••••';
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
+// RESTAURANT OWNER HANDOVER & SETUP WIZARD
+// ══════════════════════════════════════════════════════════════
+
+AdminApp.prototype.openHandoverWizard = function() {
+    const rest = this.store.getRestaurant();
+    const nameEl    = document.getElementById('hw-name');
+    const tagEl     = document.getElementById('hw-tagline');
+    const phoneEl   = document.getElementById('hw-phone');
+    const addrEl    = document.getElementById('hw-address');
+    const currEl    = document.getElementById('hw-currency');
+    const taxEl     = document.getElementById('hw-tax');
+    const ownerEl   = document.getElementById('hw-owner-name');
+    const passEl    = document.getElementById('hw-new-password');
+    const ordersEl  = document.getElementById('hw-clear-orders');
+    const wipeEl    = document.getElementById('hw-wipe-catalog');
+
+    if (nameEl)  nameEl.value = rest.name || '';
+    if (tagEl)   tagEl.value = rest.tagline || '';
+    if (phoneEl) phoneEl.value = rest.phone || '';
+    if (addrEl)  addrEl.value = rest.address || '';
+    if (currEl)  currEl.value = rest.currency || '₹';
+    if (taxEl)   taxEl.value = rest.tax_rate !== undefined ? rest.tax_rate : 5;
+    if (ownerEl) ownerEl.value = '';
+    if (passEl)  passEl.value = '';
+    if (ordersEl) ordersEl.checked = true;
+    if (wipeEl)  wipeEl.checked = false;
+
+    const modal = document.getElementById('handover-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    }
+    if (nameEl) setTimeout(() => nameEl.focus(), 100);
+};
+
+AdminApp.prototype.closeHandoverModal = function() {
+    const modal = document.getElementById('handover-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+};
+
+AdminApp.prototype.executeHandover = function() {
+    const nameEl    = document.getElementById('hw-name');
+    const tagEl     = document.getElementById('hw-tagline');
+    const phoneEl   = document.getElementById('hw-phone');
+    const addrEl    = document.getElementById('hw-address');
+    const currEl    = document.getElementById('hw-currency');
+    const taxEl     = document.getElementById('hw-tax');
+    const ownerEl   = document.getElementById('hw-owner-name');
+    const passEl    = document.getElementById('hw-new-password');
+    const ordersEl  = document.getElementById('hw-clear-orders');
+    const wipeEl    = document.getElementById('hw-wipe-catalog');
+
+    const restName = nameEl ? nameEl.value.trim() : '';
+    const newPass  = passEl ? passEl.value.trim() : '';
+
+    if (!restName) {
+        showToast('Please enter restaurant name', 'warning');
+        if (nameEl) nameEl.focus();
+        return;
+    }
+
+    if (!newPass || newPass.length < 4) {
+        showToast('Please set a master admin password (min 4 characters)', 'warning');
+        if (passEl) passEl.focus();
+        return;
+    }
+
+    const confirmMsg = `🚀 CONFIRM HANDOVER & CLIENT INITIALIZATION:\n\nYou are configuring First Bite for "${restName}".\n` +
+        `• Master Admin Password will be updated\n` +
+        (ordersEl && ordersEl.checked ? `• All past orders and sales history will be reset to 0\n` : '') +
+        (wipeEl && wipeEl.checked ? `• Menu and categories will be wiped to blank slate\n` : `• Menu and categories will be preserved as templates\n`) +
+        `\nDo you want to complete this handover now?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    this.store.executeOwnerHandover({
+        restaurantName: restName,
+        tagline: tagEl ? tagEl.value : '',
+        phone: phoneEl ? phoneEl.value : '',
+        address: addrEl ? addrEl.value : '',
+        currency: currEl ? currEl.value : '₹',
+        taxRate: taxEl ? taxEl.value : 5,
+        ownerName: ownerEl ? ownerEl.value : 'Restaurant Owner',
+        newAdminPassword: newPass,
+        resetOrders: ordersEl ? ordersEl.checked : true,
+        wipeCatalog: wipeEl ? wipeEl.checked : false
+    });
+
+    this.closeHandoverModal();
+    this.renderRestaurantInfo();
+    this.renderDashboard();
+    this.renderOrdersTable();
+    this.renderMenuTable();
+    this.renderCategoriesList();
+    this.renderStaffList();
+    this.checkAdminAuth();
+
+    showToast(`🎉 Restaurant setup complete for "${restName}"! Master credentials updated.`, 'success', 6000);
 };
 
 window.adminApp = new AdminApp();

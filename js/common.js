@@ -2,6 +2,16 @@
 // FIRST BITE — COMMON UTILITIES & TOASTS
 // ==========================================================
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function formatCurrency(amount, currency = '₹') {
     const num = Number(amount) || 0;
     return `${currency}${num.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -21,7 +31,7 @@ function timeAgo(dateString) {
     return past.toLocaleDateString();
 }
 
-function showToast(message, type = 'success', duration = 3200) {
+function showToast(message, type = 'success', duration = 3500) {
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
@@ -38,21 +48,139 @@ function showToast(message, type = 'success', duration = 3200) {
     else if (type === 'info') icon = 'ℹ️';
 
     toast.innerHTML = `
-        <span style="font-weight: 800; font-size: 16px;">${icon}</span>
-        <div style="flex: 1;">${message}</div>
+        <span class="toast-icon" style="font-weight: 800; font-size: 16px; flex-shrink: 0;">${icon}</span>
+        <div class="toast-msg" style="flex: 1; word-break: break-word;">${message}</div>
+        <button type="button" class="toast-close-btn" style="background:none; border:none; color:inherit; opacity:0.6; cursor:pointer; font-size:15px; padding:2px 4px; line-height:1; font-weight:800; margin-left:6px; flex-shrink:0;" title="Dismiss">✕</button>
     `;
 
     container.appendChild(toast);
+
+    let dismissTimer = null;
+    let isDismissed = false;
+
+    const dismissToast = (direction = 'right') => {
+        if (isDismissed) return;
+        isDismissed = true;
+        if (dismissTimer) clearTimeout(dismissTimer);
+        toast.style.transition = 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+        toast.style.transform = direction === 'left' ? 'translateX(-120%)' : 'translateX(120%)';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 260);
+    };
+
+    const startTimer = () => {
+        if (duration > 0 && !dismissTimer && !isDismissed) {
+            dismissTimer = setTimeout(() => dismissToast('right'), duration);
+        }
+    };
+
+    const clearTimer = () => {
+        if (dismissTimer) {
+            clearTimeout(dismissTimer);
+            dismissTimer = null;
+        }
+    };
+
+    // Close button click
+    toast.querySelector('.toast-close-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dismissToast('right');
+    });
+
+    // Pause on hover
+    toast.addEventListener('mouseenter', clearTimer);
+    toast.addEventListener('mouseleave', startTimer);
+
+    // Swipe / Slide-to-dismiss (Touch & Mouse Drag)
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let isDragging = false;
+
+    const onDragStart = (clientX, clientY) => {
+        if (isDismissed) return;
+        startX = clientX;
+        startY = clientY;
+        currentX = clientX;
+        isDragging = true;
+        clearTimer();
+        toast.style.transition = 'none';
+    };
+
+    const onDragMove = (clientX, clientY, e) => {
+        if (!isDragging || isDismissed) return;
+        const dx = clientX - startX;
+        const dy = clientY - startY;
+
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) {
+            if (e && e.cancelable) e.preventDefault();
+            toast.style.transform = `translateX(${dx}px)`;
+            toast.style.opacity = `${Math.max(0.1, 1 - Math.abs(dx) / 220)}`;
+        }
+    };
+
+    const onDragEnd = (clientX) => {
+        if (!isDragging || isDismissed) return;
+        isDragging = false;
+        const dx = clientX - startX;
+        const threshold = 55;
+
+        if (Math.abs(dx) > threshold) {
+            dismissToast(dx > 0 ? 'right' : 'left');
+        } else {
+            toast.style.transition = 'all 0.22s cubic-bezier(0.16, 1, 0.3, 1)';
+            toast.style.transform = 'translateX(0)';
+            toast.style.opacity = '1';
+            startTimer();
+        }
+    };
+
+    // Touch listeners
+    toast.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) onDragStart(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+
+    toast.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1) onDragMove(e.touches[0].clientX, e.touches[0].clientY, e);
+    }, { passive: false });
+
+    toast.addEventListener('touchend', (e) => {
+        const clientX = e.changedTouches[0]?.clientX || currentX;
+        onDragEnd(clientX);
+    });
+
+    toast.addEventListener('touchcancel', () => {
+        if (isDragging) {
+            isDragging = false;
+            toast.style.transition = 'all 0.2s ease';
+            toast.style.transform = 'translateX(0)';
+            toast.style.opacity = '1';
+            startTimer();
+        }
+    });
+
+    // Mouse drag listeners
+    toast.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || e.target.closest('.toast-close-btn')) return;
+        onDragStart(e.clientX, e.clientY);
+
+        const onMouseMove = (ev) => onDragMove(ev.clientX, ev.clientY, ev);
+        const onMouseUp = (ev) => {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            onDragEnd(ev.clientX);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
 
     // Trigger entrance animation
     requestAnimationFrame(() => {
         toast.classList.add('show');
     });
 
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 400);
-    }, duration);
+    startTimer();
 }
 
 // Confetti celebration generator

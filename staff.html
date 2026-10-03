@@ -24,6 +24,11 @@
         </div>
 
         <div class="staff-nav-actions">
+            <div class="staff-session-pill" id="staff-session-pill" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;color:#F8FAFC;">
+                <span id="staff-session-icon">👨‍🍳</span>
+                <span id="staff-session-name">Staff</span>
+                <button type="button" id="staff-lock-btn" onclick="window.staffApp.lockTerminal()" title="Lock Terminal / Switch Staff" style="background:none;border:none;cursor:pointer;color:#F87171;font-size:11px;font-weight:700;padding:2px 4px;margin-left:2px;">🔒 Lock</button>
+            </div>
             <button class="kitchen-status-btn" id="kitchen-status-btn" title="Toggle Kitchen Accepting Orders">
                 <span class="status-indicator-dot" id="kitchen-status-dot"></span>
                 <span id="kitchen-status-text">Open</span>
@@ -217,11 +222,73 @@
         </div>
     </div>
 
+    <!-- ════════════════════════════════════════════════════════════
+         STAFF TERMINAL PIN KEYPAD OVERLAY (POS-Style)
+    ════════════════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="staff-pin-overlay" style="display:none;z-index:9999;backdrop-filter:blur(12px);background:rgba(15,23,42,0.92);align-items:center;justify-content:center;padding:16px;">
+        <div class="modal-card" style="max-width:380px;width:100%;border-radius:20px;padding:28px 24px;background:#1E293B;border:1px solid rgba(255,255,255,0.12);box-shadow:0 25px 50px -12px rgba(0,0,0,0.6);color:#FFF;">
+            <div style="text-align:center;margin-bottom:20px;">
+                <div style="width:52px;height:52px;background:var(--primary);color:#FFF;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;margin:0 auto 10px;box-shadow:0 8px 16px rgba(226,55,68,0.35);">FB</div>
+                <h2 style="font-size:19px;font-weight:800;letter-spacing:0.5px;color:#F8FAFC;margin-bottom:2px;">Staff Terminal Lock</h2>
+                <p style="font-size:12px;color:#94A3B8;">Enter your 4-digit security PIN to unlock KDS</p>
+            </div>
+
+            <!-- PIN Dots Indicator -->
+            <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-bottom:16px;padding:12px;background:rgba(0,0,0,0.25);border-radius:12px;border:1px solid rgba(255,255,255,0.06);" id="pin-indicator-box">
+                <span class="pin-dot" id="pindot-0" style="width:14px;height:14px;border-radius:50%;border:2px solid #64748B;background:transparent;transition:all .15s;"></span>
+                <span class="pin-dot" id="pindot-1" style="width:14px;height:14px;border-radius:50%;border:2px solid #64748B;background:transparent;transition:all .15s;"></span>
+                <span class="pin-dot" id="pindot-2" style="width:14px;height:14px;border-radius:50%;border:2px solid #64748B;background:transparent;transition:all .15s;"></span>
+                <span class="pin-dot" id="pindot-3" style="width:14px;height:14px;border-radius:50%;border:2px solid #64748B;background:transparent;transition:all .15s;"></span>
+            </div>
+
+            <div id="pin-error-msg" style="display:none;color:#F87171;font-size:12px;font-weight:700;text-align:center;margin-bottom:12px;background:rgba(220,38,38,0.15);padding:6px;border-radius:8px;border:1px solid rgba(248,113,113,0.3);">
+                Incorrect 4-digit PIN — please try again
+            </div>
+
+            <!-- Staff hint shown when a chip is selected -->
+            <div id="pin-staff-hint" style="display:none;color:#34D399;font-size:12px;font-weight:700;text-align:center;margin-bottom:10px;background:rgba(16,185,129,0.12);padding:7px 10px;border-radius:8px;border:1px solid rgba(52,211,153,0.3);">
+            </div>
+
+            <!-- Quick Staff Selector Chips -->
+            <div style="margin-bottom:16px;">
+                <div style="font-size:11px;font-weight:700;color:#94A3B8;text-transform:uppercase;margin-bottom:6px;text-align:center;">Select Your Name, Then Enter PIN:</div>
+                <div id="quick-staff-chips" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;">
+                    <!-- dynamic staff buttons -->
+                </div>
+            </div>
+
+            <!-- Touch Numeric Keypad -->
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;max-width:280px;margin:0 auto 16px;">
+                <button type="button" class="pin-key-btn" data-num="1" onclick="window.staffApp.handlePinDigit('1')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">1</button>
+                <button type="button" class="pin-key-btn" data-num="2" onclick="window.staffApp.handlePinDigit('2')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">2</button>
+                <button type="button" class="pin-key-btn" data-num="3" onclick="window.staffApp.handlePinDigit('3')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">3</button>
+                <button type="button" class="pin-key-btn" data-num="4" onclick="window.staffApp.handlePinDigit('4')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">4</button>
+                <button type="button" class="pin-key-btn" data-num="5" onclick="window.staffApp.handlePinDigit('5')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">5</button>
+                <button type="button" class="pin-key-btn" data-num="6" onclick="window.staffApp.handlePinDigit('6')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">6</button>
+                <button type="button" class="pin-key-btn" data-num="7" onclick="window.staffApp.handlePinDigit('7')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">7</button>
+                <button type="button" class="pin-key-btn" data-num="8" onclick="window.staffApp.handlePinDigit('8')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">8</button>
+                <button type="button" class="pin-key-btn" data-num="9" onclick="window.staffApp.handlePinDigit('9')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">9</button>
+                <button type="button" class="pin-key-btn" id="pin-clear-btn" onclick="window.staffApp.clearPin()" style="height:54px;font-size:13px;font-weight:700;border-radius:12px;background:#475569;color:#CBD5E1;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">Clear</button>
+                <button type="button" class="pin-key-btn" data-num="0" onclick="window.staffApp.handlePinDigit('0')" style="height:54px;font-size:22px;font-weight:800;border-radius:12px;background:#334155;color:#F8FAFC;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">0</button>
+                <button type="button" class="pin-key-btn" id="pin-backspace-btn" onclick="window.staffApp.backspacePin()" style="height:54px;font-size:18px;font-weight:700;border-radius:12px;background:#475569;color:#CBD5E1;border:1px solid rgba(255,255,255,0.08);cursor:pointer;">⌫</button>
+            </div>
+
+            <!-- 1-Click Fast Unlock for Pitch & Demo Access -->
+            <button type="button" id="staff-fast-unlock-btn" onclick="window.staffApp.fastUnlockStaff('1234')" style="width:100%;max-width:280px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;gap:6px;height:40px;font-size:12.5px;font-weight:800;border-radius:10px;background:#064E3B;color:#34D399;border:1px solid rgba(52,211,153,0.35);cursor:pointer;transition:all .15s;">
+                ⚡ 1-Click Fast Unlock as Head Chef (1234)
+            </button>
+
+            <div style="text-align:center;font-size:11px;color:#94A3B8;">
+                Sample PINs: Vikram (<b>1234</b>) • Rahul (<b>5678</b>) • Priya (<b>9012</b>)
+            </div>
+        </div>
+    </div>
+
     <script src="js/supabase-sdk.min.js"></script>
     <script>if(!window.supabase){document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>')}</script>
-    <script src="js/sound-effects.js"></script>
-    <script src="js/supabase-client.js"></script>
-    <script src="js/common.js"></script>
-    <script src="js/staff.js"></script>
+    <script src="js/sound-effects.js?v=3.0"></script>
+    <script src="js/supabase-client.js?v=3.0"></script>
+    <script src="js/common.js?v=3.0"></script>
+    <script src="js/staff.js?v=3.0"></script>
 </body>
 </html>

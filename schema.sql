@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS public.coupons (
     min_order_amount NUMERIC DEFAULT 0,
     max_discount NUMERIC,
     is_active BOOLEAN DEFAULT true,
+    is_visible BOOLEAN DEFAULT true,
     expires_at TIMESTAMP WITH TIME ZONE,
     usage_count INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -250,4 +251,7 @@ SELECT * FROM (VALUES
   ('Truffle Parmesan Hand-cut Fries', 140::numeric, 'Double-fried crisp Russet potato fries tossed in aromatic Italian white truffle oil, rosemary sea salt & grated parmesan.', 'https://images.unsplash.com/photo-1576107232684-1279f3908594?auto=format&fit=crop&w=800&q=80', true, true, 4.9::numeric, '10 min', '380 kcal', 'Bestseller', '[{"name":"Warm Cheddar Sauce Dip","price":35}]'::jsonb)
 ) AS v(name, price, description, image_url, is_veg, is_available, rating, prep_time, calories, badge, add_ons)
 WHERE NOT EXISTS (SELECT 1 FROM public.menu_items LIMIT 1);
+
+-- Migration helper for existing databases:
+ALTER TABLE IF EXISTS public.coupons ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT true;
 

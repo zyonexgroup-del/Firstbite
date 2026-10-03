@@ -30,12 +30,12 @@ const DEFAULT_RESTAURANT = {
 };
 
 const DEFAULT_CATEGORIES = [
-    { id: 'cat-burgers', name: 'Burgers & Sliders', icon: '🍔', sort_order: 1, is_active: true },
-    { id: 'cat-pizzas', name: 'Artisan Pizzas', icon: '🍕', sort_order: 2, is_active: true },
-    { id: 'cat-biryani', name: 'Biryani & Bowls', icon: '🍛', sort_order: 3, is_active: true },
-    { id: 'cat-sides', name: 'Appetizers & Sides', icon: '🍟', sort_order: 4, is_active: true },
-    { id: 'cat-drinks', name: 'Cold Sips & Shakes', icon: '🥤', sort_order: 5, is_active: true },
-    { id: 'cat-desserts', name: 'Desserts & Sweets', icon: '🍰', sort_order: 6, is_active: true }
+    { id: 'cat-burgers', cloud_id: '03d2094b-4641-4e49-9896-a4932e976282', name: 'Burgers & Sliders', icon: '🍔', sort_order: 1, is_active: true },
+    { id: 'cat-pizzas',  cloud_id: '9f5662cb-3652-44d3-a3bd-1eee48616cf2', name: 'Artisan Pizzas',   icon: '🍕', sort_order: 2, is_active: true },
+    { id: 'cat-biryani', cloud_id: '56c2b4a4-ce3e-4d4f-9d9b-5207fd361e29', name: 'Biryani & Bowls',   icon: '🍛', sort_order: 3, is_active: true },
+    { id: 'cat-sides',   cloud_id: 'e8000642-bee2-4bd5-9a92-71c9d8f348b8', name: 'Appetizers & Sides', icon: '🍟', sort_order: 4, is_active: true },
+    { id: 'cat-drinks',  cloud_id: '6af22b71-ea8f-4080-aacc-a0e2f41148a1', name: 'Cold Sips & Shakes', icon: '🥤', sort_order: 5, is_active: true },
+    { id: 'cat-desserts',cloud_id: '9dcd8025-91a9-461e-bc54-71080c2e4a36', name: 'Desserts & Sweets', icon: '🍰', sort_order: 6, is_active: true }
 ];
 
 const DEFAULT_COUPONS = [
@@ -47,6 +47,7 @@ const DEFAULT_COUPONS = [
         min_order_amount: 200,
         max_discount: 100,
         is_active: true,
+        is_visible: true,
         usage_count: 34,
         description: '20% OFF on all orders above ₹200 (Max ₹100)'
     },
@@ -58,6 +59,7 @@ const DEFAULT_COUPONS = [
         min_order_amount: 300,
         max_discount: 50,
         is_active: true,
+        is_visible: true,
         usage_count: 21,
         description: 'Flat ₹50 OFF on orders above ₹300'
     },
@@ -69,9 +71,25 @@ const DEFAULT_COUPONS = [
         min_order_amount: 100,
         max_discount: 50,
         is_active: true,
+        is_visible: true,
         usage_count: 58,
         description: '10% Welcome Discount up to ₹50'
     }
+];
+
+const DEFAULT_ADMIN_AUTH = {
+    username: 'admin',
+    password: 'admin123',
+    ownerName: 'Restaurant Owner',
+    pin: '8888',
+    lastReset: null
+};
+
+const DEFAULT_STAFF = [
+    { id: 'stf-01', name: 'Vikram Sharma', role: 'Head Chef', pin: '1234', active: true, phone: '+91 98765 00001' },
+    { id: 'stf-02', name: 'Rahul Verma', role: 'Floor Captain / Waiter', pin: '5678', active: true, phone: '+91 98765 00002' },
+    { id: 'stf-03', name: 'Priya Patel', role: 'Cashier / POS Manager', pin: '9012', active: true, phone: '+91 98765 00003' },
+    { id: 'stf-04', name: 'Arjun Singh', role: 'Kitchen Station Chef', pin: '1111', active: true, phone: '+91 98765 00004' }
 ];
 
 const DEFAULT_MENU_ITEMS = [
@@ -389,6 +407,9 @@ class FirstBiteStore {
                 .on('broadcast', { event: 'COUPON_EVENT' }, (payload) => {
                     this._handleRemoteEvent(payload.payload);
                 })
+                .on('broadcast', { event: 'COUPONS_UPDATED' }, (payload) => {
+                    this._handleRemoteEvent(payload.payload);
+                })
                 .on('broadcast', { event: 'SETTINGS_EVENT' }, (payload) => {
                     this._handleRemoteEvent(payload.payload);
                 })
@@ -407,8 +428,14 @@ class FirstBiteStore {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, async () => {
                     await this.syncOrdersFromSupabase();
                 })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, async () => {
+                    await this.syncCategoriesFromSupabase();
+                })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, async () => {
                     await this.syncMenuFromSupabase();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, async () => {
+                    await this.syncCouponsFromSupabase();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'restaurants' }, async () => {
                     await this.syncSettingsFromSupabase();
@@ -461,22 +488,26 @@ class FirstBiteStore {
         window.addEventListener('storage', (e) => {
             if (e.key === 'fb_orders') {
                 this._notify('ORDER_STATUS_CHANGED', {});
-                this._notify('ORDER_CREATED', {});
+                this._notify('DATA_REFRESH', {});
             } else if (e.key === 'fb_menu') {
                 this._notify('MENU_UPDATED', {});
             } else if (e.key === 'fb_coupons') {
                 this._notify('COUPONS_UPDATED', {});
             } else if (e.key === 'fb_restaurant') {
                 this._notify('SETTINGS_UPDATED', {});
+            } else if (e.key === 'fb_staff') {
+                this._notify('STAFF_UPDATED', {});
             }
         });
     }
 
     async syncAllFromSupabase() {
         await Promise.allSettled([
+            this.syncCategoriesFromSupabase(),
             this.syncOrdersFromSupabase(),
             this.syncMenuFromSupabase(),
-            this.syncSettingsFromSupabase()
+            this.syncSettingsFromSupabase(),
+            this.syncCouponsFromSupabase()
         ]);
     }
 
@@ -555,8 +586,8 @@ class FirstBiteStore {
                     await this.seedMenuToSupabase();
                 } else {
                     // Smart merge: retain default/local menu items and overlay cloud items
-                    // This guarantees adding 1 item never deletes or clears existing items!
                     const localMenu = this.getMenuItems();
+                    const categories = this.getCategories();
                     const map = new Map();
 
                     // Seed with local items first
@@ -570,7 +601,16 @@ class FirstBiteStore {
                         const key = (item.name || '').trim().toLowerCase();
                         if (key) {
                             const existing = map.get(key) || {};
-                            map.set(key, { ...existing, ...item, id: item.id });
+                            let resolvedCatId = existing.category_id;
+                            if (item.category_id) {
+                                const catMatch = categories.find(c => c.cloud_id === item.category_id || c.id === item.category_id);
+                                if (catMatch) resolvedCatId = catMatch.id;
+                                else resolvedCatId = item.category_id;
+                            }
+                            if (!resolvedCatId) {
+                                resolvedCatId = existing.category_id || 'cat-burgers';
+                            }
+                            map.set(key, { ...existing, ...item, id: item.id, category_id: resolvedCatId });
                         } else if (item.id) {
                             map.set(item.id, item);
                         }
@@ -591,20 +631,27 @@ class FirstBiteStore {
         try {
             const items = this.getMenuItems();
             if (!items || items.length === 0) return;
+            const categories = this.getCategories();
 
-            const toInsert = items.map(item => ({
-                name: item.name,
-                price: Number(item.price) || 0,
-                description: item.description || '',
-                image_url: item.image_url || '',
-                is_veg: item.is_veg !== false,
-                is_available: item.is_available !== false,
-                rating: Number(item.rating) || 4.8,
-                prep_time: item.prep_time || '15 min',
-                calories: item.calories || '',
-                badge: item.badge || null,
-                add_ons: Array.isArray(item.add_ons) ? item.add_ons : []
-            }));
+            const toInsert = items.map(item => {
+                const cat = categories.find(c => c.id === item.category_id || c.cloud_id === item.category_id || (c.name && c.name.toLowerCase() === (item.category_id || '').toLowerCase()));
+                const cloudUuid = cat?.cloud_id || (typeof item.category_id === 'string' && item.category_id.length === 36 && item.category_id.includes('-') ? item.category_id : null);
+
+                return {
+                    name: item.name,
+                    price: Number(item.price) || 0,
+                    category_id: cloudUuid,
+                    description: item.description || '',
+                    image_url: item.image_url || '',
+                    is_veg: item.is_veg !== false,
+                    is_available: item.is_available !== false,
+                    rating: Number(item.rating) || 4.8,
+                    prep_time: item.prep_time || '15 min',
+                    calories: item.calories || '',
+                    badge: item.badge || null,
+                    add_ons: Array.isArray(item.add_ons) ? item.add_ons : []
+                };
+            });
 
             const { data, error } = await this.supabase
                 .from('menu_items')
@@ -637,6 +684,161 @@ class FirstBiteStore {
                 this._notify('SETTINGS_UPDATED', { restaurant: merged });
             }
         } catch (e) {}
+    }
+
+    async syncCategoriesFromSupabase() {
+        if (!this.supabase) return this.getCategories();
+        try {
+            const { data, error } = await this.supabase
+                .from('categories')
+                .select('*')
+                .order('sort_order', { ascending: true });
+
+            if (!error && Array.isArray(data)) {
+                if (data.length === 0) {
+                    await this.seedCategoriesToSupabase();
+                } else {
+                    const localCats = this.getCategories();
+                    // Merge cloud categories with local
+                    const merged = data.map(cloudCat => {
+                        const localMatch = localCats.find(lc => 
+                            (lc.cloud_id && lc.cloud_id === cloudCat.id) ||
+                            (lc.id === cloudCat.id) ||
+                            (lc.name && lc.name.trim().toLowerCase() === cloudCat.name.trim().toLowerCase())
+                        );
+                        return {
+                            id: localMatch ? localMatch.id : cloudCat.id,
+                            cloud_id: cloudCat.id,
+                            name: cloudCat.name,
+                            icon: cloudCat.icon || '🍽️',
+                            sort_order: cloudCat.sort_order ?? 0,
+                            is_active: cloudCat.is_active !== false
+                        };
+                    });
+
+                    // Retain any offline/local categories not in cloud
+                    localCats.forEach(lc => {
+                        if (!merged.some(m => m.id === lc.id || (lc.cloud_id && m.cloud_id === lc.cloud_id))) {
+                            merged.push(lc);
+                        }
+                    });
+
+                    localStorage.setItem('fb_categories', JSON.stringify(merged));
+                    this._notify('CATEGORY_UPDATED', { categories: merged });
+                    return merged;
+                }
+            }
+        } catch (e) {
+            console.warn('Sync categories notice:', e);
+        }
+        return this.getCategories();
+    }
+
+    async seedCategoriesToSupabase() {
+        if (!this.supabase) return;
+        try {
+            const categories = this.getCategories();
+            if (!categories || categories.length === 0) return;
+
+            const toInsert = categories.map(c => ({
+                name: c.name,
+                icon: c.icon || '🍽️',
+                sort_order: Number(c.sort_order) || 0,
+                is_active: c.is_active !== false
+            }));
+
+            const { data, error } = await this.supabase
+                .from('categories')
+                .insert(toInsert)
+                .select();
+
+            if (!error && Array.isArray(data)) {
+                const updated = categories.map(lc => {
+                    const match = data.find(d => d.name.trim().toLowerCase() === lc.name.trim().toLowerCase());
+                    return match ? { ...lc, cloud_id: match.id } : lc;
+                });
+                localStorage.setItem('fb_categories', JSON.stringify(updated));
+                this._notify('CATEGORY_UPDATED', { categories: updated });
+                console.info(`✅ Seeded ${data.length} categories to Supabase cloud!`);
+            }
+        } catch (err) {
+            console.warn('Seed categories error:', err);
+        }
+    }
+
+    async syncCouponsFromSupabase() {
+        if (!this.supabase) return this.getCoupons();
+        try {
+            const { data, error } = await this.supabase
+                .from('coupons')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (!error && Array.isArray(data)) {
+                if (data.length === 0) {
+                    await this.seedCouponsToSupabase();
+                } else {
+                    // Cache existing local visibility state to prevent schema mismatch overwrite
+                    let localMap = {};
+                    try {
+                        const local = JSON.parse(localStorage.getItem('fb_coupons')) || [];
+                        local.forEach(l => {
+                            if (l.id) localMap[l.id] = l;
+                            if (l.code) localMap[l.code.toUpperCase()] = l;
+                        });
+                    } catch {}
+
+                    const normalized = data.map(c => {
+                        const isPct = c.discount_type === 'percentage' || c.discount_type === 'percent';
+                        const minAmt = Number(c.min_order_amount ?? c.min_order_value) || 0;
+                        const codeNorm = (c.code || '').toUpperCase().trim();
+                        const localItem = localMap[c.id] || localMap[codeNorm];
+                        const isVisible = c.is_visible !== undefined ? (c.is_visible !== false) : (localItem ? (localItem.is_visible !== false) : true);
+
+                        return {
+                            id: c.id,
+                            code: codeNorm,
+                            discount_type: isPct ? 'percentage' : 'fixed',
+                            discount_value: Number(c.discount_value) || 0,
+                            min_order_amount: minAmt,
+                            min_order_value: minAmt,
+                            max_discount: c.max_discount ? Number(c.max_discount) : null,
+                            is_active: c.is_active !== false,
+                            is_visible: isVisible,
+                            expires_at: c.expires_at || null,
+                            usage_count: Number(c.usage_count) || 0,
+                            created_at: c.created_at || new Date().toISOString()
+                        };
+                    });
+
+                    localStorage.setItem('fb_coupons', JSON.stringify(normalized));
+                    this._notify('COUPONS_UPDATED', { coupons: normalized });
+                    return normalized;
+                }
+            }
+        } catch (e) {
+            console.warn('Sync coupons from Supabase notice:', e);
+        }
+        return this.getCoupons();
+    }
+
+    async seedCouponsToSupabase() {
+        if (!this.supabase) return;
+        try {
+            const payload = DEFAULT_COUPONS.map(c => ({
+                code: c.code.toUpperCase().trim(),
+                discount_type: (c.discount_type === 'flat' || c.discount_type === 'fixed') ? 'fixed' : 'percentage',
+                discount_value: Number(c.discount_value) || 0,
+                min_order_amount: Number(c.min_order_amount ?? c.min_order_value) || 0,
+                max_discount: c.max_discount ? Number(c.max_discount) : null,
+                is_active: c.is_active !== false,
+                usage_count: Number(c.usage_count) || 0
+            }));
+            await this.supabase.from('coupons').upsert(payload, { onConflict: 'code' });
+            console.info('✅ Default coupons seeded to Supabase');
+        } catch (err) {
+            console.warn('Seed coupons notice:', err);
+        }
     }
 
     _handleRemoteEvent(event) {
@@ -700,6 +902,10 @@ class FirstBiteStore {
         } else if (event.type === 'SETTINGS_UPDATED') {
             if (event.restaurant) {
                 localStorage.setItem('fb_restaurant', JSON.stringify(event.restaurant));
+            }
+        } else if (event.type === 'STAFF_UPDATED') {
+            if (event.staff) {
+                localStorage.setItem('fb_staff', JSON.stringify(event.staff));
             }
         }
 
@@ -775,7 +981,7 @@ class FirstBiteStore {
         localStorage.setItem('fb_restaurant', JSON.stringify(updated));
 
         // Dynamic theme color update
-        if (updated.primary_color) {
+        if (updated.primary_color && typeof document !== 'undefined' && document.documentElement) {
             document.documentElement.style.setProperty('--primary', updated.primary_color);
         }
 
@@ -825,7 +1031,12 @@ class FirstBiteStore {
 
     getCategories() {
         try {
-            return JSON.parse(localStorage.getItem('fb_categories')) || DEFAULT_CATEGORIES;
+            const raw = localStorage.getItem('fb_categories');
+            if (raw === null) {
+                return DEFAULT_CATEGORIES;
+            }
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
         } catch {
             return DEFAULT_CATEGORIES;
         }
@@ -843,7 +1054,7 @@ class FirstBiteStore {
         const categories = this.getCategories();
         let saved;
         if (category.id) {
-            const idx = categories.findIndex(c => c.id === category.id);
+            const idx = categories.findIndex(c => c.id === category.id || (category.cloud_id && c.cloud_id === category.cloud_id));
             if (idx >= 0) {
                 saved = { ...categories[idx], ...category };
                 categories[idx] = saved;
@@ -865,17 +1076,56 @@ class FirstBiteStore {
             type: 'CATEGORY_UPDATED',
             categories
         });
+
+        // Sync with Supabase cloud
+        if (this.supabase) {
+            (async () => {
+                try {
+                    const isUuid = typeof saved.id === 'string' && saved.id.length === 36 && saved.id.includes('-');
+                    const payload = {
+                        name: saved.name,
+                        icon: saved.icon || '🍽️',
+                        sort_order: Number(saved.sort_order) || 0,
+                        is_active: saved.is_active !== false
+                    };
+                    if (isUuid) payload.id = saved.id;
+                    else if (saved.cloud_id) payload.id = saved.cloud_id;
+
+                    const { data, error } = await this.supabase
+                        .from('categories')
+                        .upsert([payload])
+                        .select()
+                        .maybeSingle();
+
+                    if (!error && data && data.id) {
+                        saved.cloud_id = data.id;
+                        localStorage.setItem('fb_categories', JSON.stringify(categories));
+                    }
+                } catch (err) {
+                    console.warn('Supabase saveCategory notice:', err);
+                }
+            })();
+        }
+
         return saved;
     }
 
     deleteCategory(catId) {
         let categories = this.getCategories();
-        categories = categories.filter(c => c.id !== catId);
+        const target = categories.find(c => c.id === catId || c.cloud_id === catId);
+        categories = categories.filter(c => c.id !== catId && c.cloud_id !== catId);
         localStorage.setItem('fb_categories', JSON.stringify(categories));
         this._broadcast({
             type: 'CATEGORY_UPDATED',
             categories
         });
+
+        if (this.supabase && target) {
+            const uuidToDelete = target.cloud_id || (typeof target.id === 'string' && target.id.length === 36 && target.id.includes('-') ? target.id : null);
+            if (uuidToDelete) {
+                this.supabase.from('categories').delete().eq('id', uuidToDelete).then(() => {}).catch(() => {});
+            }
+        }
     }
 
     // ----------------------------------------------------
@@ -885,9 +1135,12 @@ class FirstBiteStore {
     getMenuItems() {
         try {
             const raw = localStorage.getItem('fb_menu');
-            let menu = raw ? JSON.parse(raw) : DEFAULT_MENU_ITEMS;
-            if (!Array.isArray(menu) || menu.length === 0) {
+            let menu;
+            if (raw === null) {
                 menu = DEFAULT_MENU_ITEMS;
+            } else {
+                menu = JSON.parse(raw);
+                if (!Array.isArray(menu)) menu = [];
             }
 
             // Sanitize: ensure every dish has a valid unique ID and boolean is_available
@@ -960,6 +1213,9 @@ class FirstBiteStore {
             (async () => {
                 try {
                     const isUuid = typeof resolvedItem.id === 'string' && resolvedItem.id.length === 36 && resolvedItem.id.includes('-');
+                    const categories = this.getCategories();
+                    const cat = categories.find(c => c.id === resolvedItem.category_id || c.cloud_id === resolvedItem.category_id || (c.name && c.name.toLowerCase() === (resolvedItem.category_id || '').toLowerCase()));
+                    const cloudCatUuid = cat?.cloud_id || (typeof resolvedItem.category_id === 'string' && resolvedItem.category_id.length === 36 && resolvedItem.category_id.includes('-') ? resolvedItem.category_id : null);
 
                     const dbPayload = {
                         name: resolvedItem.name,
@@ -972,6 +1228,7 @@ class FirstBiteStore {
                         add_ons: Array.isArray(resolvedItem.add_ons) ? resolvedItem.add_ons : []
                     };
                     if (isUuid) dbPayload.id = resolvedItem.id;
+                    if (cloudCatUuid) dbPayload.category_id = cloudCatUuid;
 
                     const { data: savedRecord, error: saveErr } = await this.supabase
                         .from('menu_items')
@@ -1089,49 +1346,147 @@ class FirstBiteStore {
     // ----------------------------------------------------
 
     getCoupons() {
+        let list;
         try {
-            return JSON.parse(localStorage.getItem('fb_coupons')) || DEFAULT_COUPONS;
+            list = JSON.parse(localStorage.getItem('fb_coupons')) || DEFAULT_COUPONS;
         } catch {
-            return DEFAULT_COUPONS;
+            list = DEFAULT_COUPONS;
         }
+        return list.map(c => {
+            const isPct = c.discount_type === 'percentage' || c.discount_type === 'percent';
+            const minAmt = Number(c.min_order_amount ?? c.min_order_value) || 0;
+            return {
+                id: c.id,
+                code: (c.code || '').toUpperCase().trim(),
+                discount_type: isPct ? 'percentage' : 'fixed',
+                discount_value: Number(c.discount_value) || 0,
+                min_order_amount: minAmt,
+                min_order_value: minAmt,
+                max_discount: c.max_discount ? Number(c.max_discount) : null,
+                is_active: c.is_active !== false,
+                is_visible: c.is_visible !== false,
+                expires_at: c.expires_at || null,
+                usage_count: Number(c.usage_count) || 0,
+                created_at: c.created_at || new Date().toISOString()
+            };
+        });
     }
 
     saveCoupon(coupon) {
         const coupons = this.getCoupons();
-        const existingIdx = coupons.findIndex(c => c.id === coupon.id || c.code.toUpperCase() === coupon.code.toUpperCase());
+        const codeNormalized = (coupon.code || '').toUpperCase().trim();
+        const existingIdx = coupons.findIndex(c => c.id === coupon.id || c.code.toUpperCase() === codeNormalized);
         
+        const isPct = coupon.discount_type === 'percentage' || coupon.discount_type === 'percent';
+        const minAmt = Number(coupon.min_order_amount ?? coupon.min_order_value) || 0;
+        const discountVal = Number(coupon.discount_value) || 0;
+        const maxDiscountVal = coupon.max_discount ? Number(coupon.max_discount) : null;
+        const isActive = coupon.is_active !== false;
+        const isVisible = coupon.is_visible !== false;
+
         let saved;
         if (existingIdx >= 0) {
-            saved = { ...coupons[existingIdx], ...coupon, code: coupon.code.toUpperCase().trim() };
+            saved = {
+                ...coupons[existingIdx],
+                ...coupon,
+                code: codeNormalized,
+                discount_type: isPct ? 'percentage' : 'fixed',
+                discount_value: discountVal,
+                min_order_amount: minAmt,
+                min_order_value: minAmt,
+                max_discount: maxDiscountVal,
+                is_active: isActive,
+                is_visible: isVisible,
+                expires_at: coupon.expires_at || null
+            };
             coupons[existingIdx] = saved;
         } else {
             saved = {
                 id: coupon.id || `cpn-${Date.now()}`,
-                code: coupon.code.toUpperCase().trim(),
-                discount_type: coupon.discount_type || 'percentage',
-                discount_value: parseFloat(coupon.discount_value) || 0,
-                min_order_amount: parseFloat(coupon.min_order_amount) || 0,
-                max_discount: coupon.max_discount ? parseFloat(coupon.max_discount) : null,
-                is_active: coupon.is_active !== false,
+                code: codeNormalized,
+                discount_type: isPct ? 'percentage' : 'fixed',
+                discount_value: discountVal,
+                min_order_amount: minAmt,
+                min_order_value: minAmt,
+                max_discount: maxDiscountVal,
+                is_active: isActive,
+                is_visible: isVisible,
+                expires_at: coupon.expires_at || null,
                 usage_count: 0,
-                created_at: new Date().toISOString(),
-                ...coupon
+                created_at: new Date().toISOString()
             };
             coupons.unshift(saved);
         }
 
         localStorage.setItem('fb_coupons', JSON.stringify(coupons));
         this._broadcast({ type: 'COUPONS_UPDATED', coupons });
+
+        // Sync with Supabase cloud
+        if (this.supabase) {
+            (async () => {
+                try {
+                    const isUuid = typeof saved.id === 'string' && saved.id.length === 36 && saved.id.includes('-');
+                    const basePayload = {
+                        code: saved.code,
+                        discount_type: isPct ? 'percentage' : 'fixed',
+                        discount_value: saved.discount_value,
+                        min_order_amount: saved.min_order_amount,
+                        max_discount: saved.max_discount,
+                        is_active: saved.is_active,
+                        expires_at: saved.expires_at
+                    };
+                    if (isUuid) basePayload.id = saved.id;
+
+                    // Upsert valid schema columns to Supabase
+                    const { data, error } = await this.supabase
+                        .from('coupons')
+                        .upsert([basePayload], { onConflict: 'code' })
+                        .select()
+                        .maybeSingle();
+
+                    if (error) {
+                        console.warn('Supabase saveCoupon notice:', error.message);
+                    } else if (data && data.id && data.id !== saved.id) {
+                        saved.id = data.id;
+                        localStorage.setItem('fb_coupons', JSON.stringify(coupons));
+                    }
+                } catch (err) {
+                    console.warn('Supabase saveCoupon notice:', err);
+                }
+            })();
+        }
+
         return saved;
     }
 
     toggleCoupon(id, isActive) {
         const coupons = this.getCoupons();
-        const c = coupons.find(x => x.id === id);
+        const c = coupons.find(x => x.id === id || x.code === id);
         if (c) {
-            c.is_active = isActive;
+            c.is_active = Boolean(isActive);
             localStorage.setItem('fb_coupons', JSON.stringify(coupons));
             this._broadcast({ type: 'COUPONS_UPDATED', coupons });
+
+            if (this.supabase) {
+                const isUuid = typeof c.id === 'string' && c.id.length === 36 && c.id.includes('-');
+                const q = isUuid
+                    ? this.supabase.from('coupons').update({ is_active: c.is_active }).eq('id', c.id)
+                    : this.supabase.from('coupons').update({ is_active: c.is_active }).eq('code', c.code);
+                q.then(() => {}).catch(e => console.warn('Supabase toggleCoupon error:', e));
+            }
+            return c;
+        }
+        return null;
+    }
+
+    toggleCouponVisibility(id, isVisible) {
+        const coupons = this.getCoupons();
+        const c = coupons.find(x => x.id === id || x.code === id);
+        if (c) {
+            c.is_visible = Boolean(isVisible);
+            localStorage.setItem('fb_coupons', JSON.stringify(coupons));
+            this._broadcast({ type: 'COUPONS_UPDATED', coupons });
+            // Note: is_visible is managed locally (app-side) as Supabase coupons table does not have an is_visible column
             return c;
         }
         return null;
@@ -1139,31 +1494,40 @@ class FirstBiteStore {
 
     deleteCoupon(id) {
         let coupons = this.getCoupons();
-        coupons = coupons.filter(c => c.id !== id);
+        const target = coupons.find(c => c.id === id || c.code === id);
+        coupons = coupons.filter(c => c.id !== id && c.code !== id);
         localStorage.setItem('fb_coupons', JSON.stringify(coupons));
         this._broadcast({ type: 'COUPONS_UPDATED', coupons });
+
+        if (this.supabase && target) {
+            const isUuid = typeof target.id === 'string' && target.id.length === 36 && target.id.includes('-');
+            const q = isUuid
+                ? this.supabase.from('coupons').delete().eq('id', target.id)
+                : this.supabase.from('coupons').delete().eq('code', target.code);
+            q.then(() => {}).catch(e => console.warn('Supabase deleteCoupon error:', e));
+        }
     }
 
     validateCoupon(code, subtotal) {
         if (!code || !code.trim()) {
-            return { valid: false, message: 'Please enter a coupon code.' };
+            return { valid: false, message: 'Please enter a promo code.' };
         }
 
         const normalized = code.trim().toUpperCase();
         const coupons = this.getCoupons();
-        const c = coupons.find(x => x.code.toUpperCase() === normalized);
+        const c = coupons.find(x => (x.code || '').toUpperCase() === normalized);
 
         if (!c) {
-            return { valid: false, message: `Coupon code '${normalized}' does not exist.` };
+            return { valid: false, message: `Promo code '${normalized}' does not exist.` };
         }
         if (!c.is_active) {
-            return { valid: false, message: `Coupon '${normalized}' is currently inactive.` };
+            return { valid: false, message: `Promo '${normalized}' is currently inactive.` };
         }
         if (c.expires_at && new Date(c.expires_at) < new Date()) {
-            return { valid: false, message: `Coupon '${normalized}' has expired.` };
+            return { valid: false, message: `Promo '${normalized}' has expired.` };
         }
-        const minOrderAmt = c.min_order_value || c.min_order_amount || 0;
-        if (minOrderAmt && subtotal < minOrderAmt) {
+        const minOrderAmt = Number(c.min_order_amount ?? c.min_order_value) || 0;
+        if (minOrderAmt > 0 && subtotal < minOrderAmt) {
             return { valid: false, message: `Minimum order of ₹${minOrderAmt} required for '${normalized}'.` };
         }
 
@@ -1171,12 +1535,12 @@ class FirstBiteStore {
         let discount = 0;
         if (isPercent) {
             discount = Math.round((subtotal * c.discount_value) / 100);
-            const maxCap = c.max_discount || c.max_discount_cap || 0;
-            if (maxCap && discount > maxCap) {
+            const maxCap = Number(c.max_discount) || 0;
+            if (maxCap > 0 && discount > maxCap) {
                 discount = maxCap;
             }
         } else {
-            discount = Math.min(c.discount_value, subtotal);
+            discount = Math.min(Number(c.discount_value) || 0, subtotal);
         }
 
         return {
@@ -1379,7 +1743,7 @@ class FirstBiteStore {
 
                         // Broadcast verified cloud record with real UUID
                         this._broadcast({
-                            type: 'ORDER_CREATED',
+                            type: 'ORDER_SYNCED',
                             order: { ...newOrder, id: supabaseId }
                         });
 
@@ -1574,7 +1938,229 @@ class FirstBiteStore {
         localStorage.setItem('fb_menu', JSON.stringify(DEFAULT_MENU_ITEMS));
         localStorage.setItem('fb_coupons', JSON.stringify(DEFAULT_COUPONS));
         localStorage.setItem('fb_orders', JSON.stringify([]));
+        localStorage.setItem('fb_staff', JSON.stringify(DEFAULT_STAFF));
+        localStorage.setItem('fb_admin_auth', JSON.stringify(DEFAULT_ADMIN_AUTH));
         this._broadcast({ type: 'DATA_REFRESH' });
+    }
+
+    clearAllOrders() {
+        localStorage.setItem('fb_orders', JSON.stringify([]));
+        this._broadcast({ type: 'ORDERS_UPDATED', orders: [] });
+        this._broadcast({ type: 'DATA_REFRESH' });
+        if (this.supabase) {
+            this.supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000').then(() => {
+                this.supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000').then(() => {}).catch(() => {});
+            }).catch(() => {});
+        }
+    }
+
+    wipeCatalog() {
+        localStorage.setItem('fb_menu', JSON.stringify([]));
+        localStorage.setItem('fb_categories', JSON.stringify([]));
+        this._broadcast({ type: 'MENU_UPDATED', menu: [] });
+        this._broadcast({ type: 'CATEGORY_UPDATED', categories: [] });
+        this._broadcast({ type: 'DATA_REFRESH' });
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ADMIN AUTH & ACCESS CONTROL
+    // ══════════════════════════════════════════════════════════
+
+    getAdminAuth() {
+        try {
+            const raw = localStorage.getItem('fb_admin_auth');
+            if (raw) return JSON.parse(raw);
+        } catch(e) {}
+        localStorage.setItem('fb_admin_auth', JSON.stringify(DEFAULT_ADMIN_AUTH));
+        return { ...DEFAULT_ADMIN_AUTH };
+    }
+
+    saveAdminAuth(authData) {
+        const current = this.getAdminAuth();
+        const updated = { ...current, ...authData, updatedAt: new Date().toISOString() };
+        localStorage.setItem('fb_admin_auth', JSON.stringify(updated));
+        this._broadcast({ type: 'ADMIN_AUTH_UPDATED', auth: updated });
+        return updated;
+    }
+
+    isAdminLoggedIn() {
+        return sessionStorage.getItem('fb_admin_session') === 'true';
+    }
+
+    loginAdmin(username, password) {
+        const auth = this.getAdminAuth();
+        const u = (username || '').trim();
+        const p = (password || '').trim();
+        if (u.toLowerCase() === auth.username.toLowerCase() && p === auth.password) {
+            sessionStorage.setItem('fb_admin_session', 'true');
+            sessionStorage.setItem('fb_admin_user', auth.username);
+            this._broadcast({ type: 'ADMIN_SESSION_CHANGED', loggedIn: true, user: auth.username });
+            return { success: true };
+        }
+        return { success: false, error: 'Invalid username or password' };
+    }
+
+    logoutAdmin() {
+        sessionStorage.removeItem('fb_admin_session');
+        sessionStorage.removeItem('fb_admin_user');
+        this._broadcast({ type: 'ADMIN_SESSION_CHANGED', loggedIn: false });
+    }
+
+    changeMasterPassword(oldPassword, newPassword) {
+        const auth = this.getAdminAuth();
+        if (auth.password !== oldPassword) {
+            return { success: false, error: 'Current master password is incorrect' };
+        }
+        if (!newPassword || newPassword.length < 4) {
+            return { success: false, error: 'New password must be at least 4 characters long' };
+        }
+        this.saveAdminAuth({ password: newPassword });
+        return { success: true };
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // STAFF ROSTER & 4-DIGIT PIN AUTHENTICATION
+    // ══════════════════════════════════════════════════════════
+
+    getStaffMembers() {
+        try {
+            const raw = localStorage.getItem('fb_staff');
+            if (raw) return JSON.parse(raw);
+        } catch(e) {}
+        localStorage.setItem('fb_staff', JSON.stringify(DEFAULT_STAFF));
+        return [...DEFAULT_STAFF];
+    }
+
+    saveStaffMember(member) {
+        const list = this.getStaffMembers();
+        const cleanPin = String(member.pin || '').trim();
+
+        if (!/^\d{4}$/.test(cleanPin)) {
+            throw new Error('PIN must be exactly 4 digits (e.g. 1234)');
+        }
+
+        const duplicate = list.find(s => s.id !== member.id && s.pin === cleanPin && s.active !== false);
+        if (duplicate) {
+            throw new Error(`PIN "${cleanPin}" is already assigned to ${duplicate.name}. Please choose a unique 4-digit PIN.`);
+        }
+
+        let updatedList;
+        if (member.id) {
+            const idx = list.findIndex(s => s.id === member.id);
+            if (idx >= 0) {
+                list[idx] = { ...list[idx], ...member, pin: cleanPin, updatedAt: new Date().toISOString() };
+                updatedList = list;
+            } else {
+                updatedList = [...list, { ...member, pin: cleanPin, id: member.id || 'stf-' + Date.now() }];
+            }
+        } else {
+            const newMember = {
+                id: 'stf-' + Date.now(),
+                name: (member.name || '').trim(),
+                role: member.role || 'Kitchen Staff',
+                pin: cleanPin,
+                phone: member.phone || '',
+                active: member.active !== false,
+                createdAt: new Date().toISOString()
+            };
+            updatedList = [...list, newMember];
+        }
+
+        localStorage.setItem('fb_staff', JSON.stringify(updatedList));
+        this._broadcast({ type: 'STAFF_UPDATED', staff: updatedList });
+        return updatedList;
+    }
+
+    deleteStaffMember(id) {
+        let list = this.getStaffMembers();
+        const activeCount = list.filter(s => s.active !== false).length;
+        const target = list.find(s => s.id === id);
+        if (activeCount <= 1 && target && target.active !== false) {
+            throw new Error('Cannot delete the last active staff member. The terminal requires at least one staff login.');
+        }
+
+        list = list.filter(s => s.id !== id);
+        localStorage.setItem('fb_staff', JSON.stringify(list));
+        this._broadcast({ type: 'STAFF_UPDATED', staff: list });
+
+        const currentSession = this.getStaffSession();
+        if (currentSession && currentSession.id === id) {
+            this.logoutStaff();
+        }
+        return list;
+    }
+
+    validateStaffPin(pin) {
+        const list = this.getStaffMembers();
+        const cleanPin = String(pin || '').trim();
+        return list.find(s => s.pin === cleanPin && s.active !== false) || null;
+    }
+
+    getStaffSession() {
+        try {
+            const raw = sessionStorage.getItem('fb_staff_session');
+            if (raw) return JSON.parse(raw);
+        } catch(e) {}
+        return null;
+    }
+
+    loginStaff(pin) {
+        const staff = this.validateStaffPin(pin);
+        if (staff) {
+            sessionStorage.setItem('fb_staff_session', JSON.stringify(staff));
+            this._broadcast({ type: 'STAFF_SESSION_CHANGED', loggedIn: true, staff });
+            return { success: true, staff };
+        }
+        return { success: false, error: 'Incorrect 4-digit PIN' };
+    }
+
+    logoutStaff() {
+        sessionStorage.removeItem('fb_staff_session');
+        this._broadcast({ type: 'STAFF_SESSION_CHANGED', loggedIn: false });
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // RESTAURANT OWNER HANDOVER & SETUP WIZARD
+    // ══════════════════════════════════════════════════════════
+
+    executeOwnerHandover(params) {
+        const currentRest = this.getRestaurant();
+        const updatedRest = {
+            ...currentRest,
+            name: (params.restaurantName || currentRest.name).trim(),
+            tagline: (params.tagline || currentRest.tagline).trim(),
+            phone: (params.phone || currentRest.phone).trim(),
+            address: (params.address || currentRest.address).trim(),
+            currency: (params.currency || currentRest.currency).trim(),
+            tax_rate: params.taxRate !== undefined ? Number(params.taxRate) : currentRest.tax_rate,
+            is_open: true
+        };
+        this.saveRestaurant(updatedRest);
+
+        if (params.newAdminPassword) {
+            this.saveAdminAuth({
+                username: (params.adminUsername || 'admin').trim(),
+                password: params.newAdminPassword.trim(),
+                ownerName: (params.ownerName || 'Restaurant Owner').trim(),
+                lastReset: new Date().toISOString()
+            });
+        }
+
+        if (params.resetOrders) {
+            this.clearAllOrders();
+        }
+
+        if (params.wipeCatalog) {
+            this.wipeCatalog();
+        }
+
+        if (Array.isArray(params.initialStaff) && params.initialStaff.length > 0) {
+            localStorage.setItem('fb_staff', JSON.stringify(params.initialStaff));
+            this._broadcast({ type: 'STAFF_UPDATED', staff: params.initialStaff });
+        }
+
+        this._broadcast({ type: 'DATA_REFRESH' });
+        return { success: true };
     }
 }
 
